@@ -116,6 +116,16 @@ export async function executeRequest(
     validateStatus: () => true, // Don't throw on non-2xx
   };
 
+  // @no-cookie-jar — disable credential / cookie handling
+  if (request.directives.has('no-cookie-jar')) {
+    axiosConfig.withCredentials = false;
+  }
+
+  // @no-auto-encoding — don't auto-decompress responses
+  if (request.directives.has('no-auto-encoding')) {
+    axiosConfig.decompress = false;
+  }
+
   if (body !== undefined) {
     // If content-type is JSON, parse it for axios
     const ct = headers['Content-Type'] || headers['content-type'] || '';
@@ -131,6 +141,10 @@ export async function executeRequest(
   }
 
   if (request.timeout) axiosConfig.timeout = request.timeout;
+  // @connection-timeout — use as timeout fallback when no request timeout is set
+  if (request.connectionTimeout && !axiosConfig.timeout) {
+    axiosConfig.timeout = request.connectionTimeout;
+  }
 
   if (verbose) {
     console.log(`\n→ ${request.method} ${url}`);

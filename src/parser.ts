@@ -32,16 +32,39 @@ export function parseHttpStringEntries(
   const entries: ParsedEntry[] = [];
 
   for (const block of blocks) {
-    const directiveEntries = extractDirectives(block, baseDir);
+    // Split block into leading directives vs request content.
+    // Only lines BEFORE the first request-like line can be directives;
+    // anything after (headers, body) must be preserved even if it
+    // happens to start with "import" or "run".
+    const directiveLines: string[] = [];
+    const requestLines: string[] = [];
+    let seenRequestLine = false;
+
+    for (const line of block) {
+      const trimmed = line.trim();
+      if (!seenRequestLine && isDirectiveLine(trimmed)) {
+        directiveLines.push(line);
+      } else {
+        // A non-blank, non-comment line marks the start of request content
+        if (
+          !seenRequestLine &&
+          trimmed &&
+          !trimmed.startsWith('#') &&
+          !trimmed.startsWith('//')
+        ) {
+          seenRequestLine = true;
+        }
+        requestLines.push(line);
+      }
+    }
+
+    const directiveEntries = extractDirectives(directiveLines, baseDir);
     if (directiveEntries.length) {
       entries.push(...directiveEntries);
     }
-    // After directives are removed the block may still contain a request
-    const remaining = block.filter(
-      (line) => !isDirectiveLine(line),
-    );
-    if (remaining.length) {
-      const desc = parseRequestBlock(remaining, baseDir);
+
+    if (requestLines.length) {
+      const desc = parseRequestBlock(requestLines, baseDir);
       if (desc) {
         entries.push({ kind: 'request', descriptor: desc });
       }

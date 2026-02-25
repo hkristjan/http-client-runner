@@ -569,6 +569,12 @@ for (const r of results) {
 console.log(`\nTests: ${summary.passedTests} passed, ${summary.failedTests} failed`);
 ```
 
+## Security
+
+**Treat `.http` files with JavaScript handlers as executable code.** Response handlers (`> {% %}`) and pre-request scripts (`< {% %}`) run inside a Node.js `vm` context, which is not a security sandbox. Malicious scripts can escape the VM and access the host process.
+
+This is consistent with how JetBrains' own HTTP Client works — handlers run in-process with full trust. Only run `.http` files you trust, the same way you would only run scripts you trust.
+
 ## Development
 
 ```bash

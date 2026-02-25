@@ -37,16 +37,20 @@ function parseArgs(argv: string[]): CliArgs {
       args.verbose = true;
     } else if (arg === '--env' || arg === '-e') {
       i++;
+      if (!argv[i] || argv[i].startsWith('-')) {
+        console.error('Error: --env requires a value (e.g. --env development)');
+        process.exit(1);
+      }
       args.environment = argv[i];
     } else if (arg === '--var' || arg === '-v') {
       i++;
       const kv = argv[i];
-      if (kv) {
-        const eqIdx = kv.indexOf('=');
-        if (eqIdx > 0) {
-          args.variables[kv.slice(0, eqIdx)] = kv.slice(eqIdx + 1);
-        }
+      if (!kv || !kv.includes('=')) {
+        console.error('Error: --var requires key=value format (e.g. --var host=localhost)');
+        process.exit(1);
       }
+      const eqIdx = kv.indexOf('=');
+      args.variables[kv.slice(0, eqIdx)] = kv.slice(eqIdx + 1);
     } else if (!arg.startsWith('-')) {
       args.files.push(arg);
     } else {

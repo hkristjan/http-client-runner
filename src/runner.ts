@@ -152,15 +152,16 @@ async function _runEntries(
         requestCounter++;
         const req = entry.descriptor;
         const label = req.name || `Request #${requestCounter}`;
+        const shouldLog = verbose && !req.directives.has('no-log');
 
-        if (verbose) {
+        if (shouldLog) {
           console.log(`\n${'='.repeat(60)}`);
           console.log(`  ${label}`);
           console.log(`${'='.repeat(60)}`);
         }
 
         const result = await executeRequest(req, client, envVars, {
-          verbose,
+          verbose: shouldLog,
           baseDir,
         });
 
@@ -220,11 +221,12 @@ async function _executeRunDirective(
 ): Promise<RequestResult[]> {
   const results: RequestResult[] = [];
 
-  // Build scoped env vars with any (@key=value) overrides
+  // Build scoped env vars with any (@key=value) overrides.
+  // These are intentionally NOT written to client.global so they
+  // stay scoped to this run directive and don't leak into later requests.
   const scopedEnvVars: Record<string, string> = { ...envVars };
   for (const [k, v] of Object.entries(directive.variableOverrides)) {
     scopedEnvVars[k] = v;
-    client.global.set(k, v);
   }
 
   // Collect the request(s) to execute

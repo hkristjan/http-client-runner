@@ -45,11 +45,11 @@
   "license": "CC-BY-NC-4.0",
   "repository": {
     "type": "git",
-    "url": "http://github.com/hkristjan/http-client-runner/"
+    "url": "https://github.com/hkristjan/http-client-runner/"
   },
-  "homepage": "",
+  "homepage": "https://github.com/hkristjan/http-client-runner#readme",
   "bugs": {
-    "url": ""
+    "url": "https://github.com/hkristjan/http-client-runner/issues"
   },
   "engines": {
     "node": ">=16.0.0"

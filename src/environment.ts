@@ -79,7 +79,7 @@ export function substituteVariables(
 ): string | null {
   if (!str) return str;
 
-  return str.replace(/\{\{(.+?)\}\}/g, (_match: string, varName: string) => {
+  return str.replace(/{{(.+?)}}/g, (_match: string, varName: string) => {
     const name = varName.trim();
 
     // Dynamic built-in variables
