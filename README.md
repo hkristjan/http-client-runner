@@ -2,7 +2,7 @@
 
 
 [![npm version](https://img.shields.io/npm/v/http-client-runner.svg)](https://www.npmjs.com/package/http-client-runner)
-[![license](https://img.shields.io/npm/l/http-client-runner.svg)](https://github.com/user/http-client-runner/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/http-client-runner.svg)](https://github.com/hkristjan/http-client-runner/blob/main/LICENSE)
 
 Execute JetBrains-style `.http` files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments.
 

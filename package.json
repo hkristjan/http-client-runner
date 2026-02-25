@@ -45,7 +45,7 @@
   "license": "CC-BY-NC-4.0",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "http://github.com/hkristjan/http-client-runner/"
   },
   "homepage": "",
   "bugs": {
