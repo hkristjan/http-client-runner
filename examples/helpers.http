@@ -1,0 +1,31 @@
+### Health Check
+GET {{host}}/get?action=health
+Accept: application/json
+
+> {%
+    client.global.set("serviceHealthy", response.status === 200 ? "true" : "false");
+    client.log("Service healthy: " + client.global.get("serviceHealthy"));
+
+    client.test("Health check passes", function() {
+        client.assert(response.status === 200, "Service not healthy");
+    });
+%}
+
+### Create Resource
+POST {{host}}/post
+Content-Type: application/json
+
+{
+  "action": "create",
+  "name": "{{resourceName}}",
+  "owner": "{{userId}}"
+}
+
+> {%
+    client.global.set("createdId", "res-" + Math.floor(Math.random() * 10000));
+    client.log("Created resource: " + client.global.get("createdId"));
+
+    client.test("Create returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}

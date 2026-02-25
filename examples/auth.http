@@ -1,0 +1,34 @@
+### Login
+POST {{host}}/post
+Content-Type: application/json
+
+{
+  "action": "login",
+  "username": "admin",
+  "password": "secret"
+}
+
+> {%
+    // Simulate extracting a token from a login response
+    client.global.set("authToken", "tok_" + response.body.json.username + "_abc123");
+    client.global.set("userId", "user-42");
+    client.log("Authenticated as " + response.body.json.username);
+    client.log("Token: " + client.global.get("authToken"));
+%}
+
+### Get User Profile
+GET {{host}}/get?action=profile&userId={{userId}}
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+> {%
+    client.test("Profile returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+    client.test("Auth header was sent", function() {
+        client.assert(
+            response.body.headers["Authorization"] !== undefined,
+            "Authorization header missing"
+        );
+    });
+%}

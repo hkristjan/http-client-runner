@@ -1,0 +1,79 @@
+### Step 1: Simple GET request
+GET {{host}}/get?source=http-client&id={{$uuid}}
+Accept: application/json
+
+> {%
+    client.log("################ Step 1 status: " + response.status);
+    client.global.set("origin", response.body.origin);
+
+    client.test("GET returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+
+    client.test("Response is JSON", function() {
+        client.assert(response.contentType.mimeType === "application/json", "Expected JSON");
+    });
+%}
+
+### Step 2: POST with data from step 1
+< {%
+    client.log("######################## Origin from Step 1: " + client.global.get("origin"));
+%}
+POST {{host}}/post
+Content-Type: application/json
+
+{
+  "previousOrigin": "{{origin}}",
+  "message": "Hello from http-client"
+}
+
+> {%
+    client.log("Step 2 status: " + response.status);
+    client.global.set("echoedData", JSON.stringify(response.body.json));
+
+    client.test("POST returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+
+    client.test("Body was echoed back", function() {
+        client.assert(response.body.json.message === "Hello from http-client", "Message mismatch");
+    });
+
+    client.test("Origin was passed correctly", function() {
+        client.assert(response.body.json.previousOrigin === client.global.get("origin"), "Origin mismatch");
+    });
+%}
+
+### Step 3: PUT request with custom headers
+PUT {{host}}/put
+Content-Type: application/json
+X-Custom-Header: my-value
+X-Request-Id: {{$uuid}}
+
+{
+  "update": true,
+  "previousData": {{echoedData}}
+}
+
+> {%
+    client.test("PUT returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+
+    client.test("Custom header was sent", function() {
+        client.assert(
+            response.body.headers["X-Custom-Header"] === "my-value",
+            "Custom header missing"
+        );
+    });
+%}
+
+### Step 4: DELETE request
+DELETE {{host}}/delete
+Accept: application/json
+
+> {%
+    client.test("DELETE returns 200", function() {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}

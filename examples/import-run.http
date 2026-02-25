@@ -1,0 +1,40 @@
+# This file demonstrates the import/run functionality.
+#
+# `import` loads named requests from another .http file.
+# `run` executes requests — either a whole file or a named request.
+# Variable overrides can be passed as (@key=value).
+
+import auth.http
+import helpers.http
+
+### Step 1: Run the Login request from auth.http
+run #Login
+
+### Step 2: Run a named request with variable overrides
+run #Create Resource (@resourceName=my-widget)
+
+### Step 3: Verify both operations completed by using the globals they set
+GET {{host}}/get?token={{authToken}}&resource={{createdId}}&user={{userId}}
+Accept: application/json
+
+> {%
+    client.test("Auth token was set by imported Login", function() {
+        const token = client.global.get("authToken");
+        client.assert(token !== undefined && token !== null, "authToken not set");
+        client.log("authToken = " + token);
+    });
+
+    client.test("Resource ID was set by imported Create Resource", function() {
+        const id = client.global.get("createdId");
+        client.assert(id !== undefined && id !== null, "createdId not set");
+        client.log("createdId = " + id);
+    });
+
+    client.test("User ID was set by Login", function() {
+        const uid = client.global.get("userId");
+        client.assert(uid === "user-42", "Expected userId to be user-42, got " + uid);
+    });
+%}
+
+### Step 4: Run an entire file inline
+run helpers.http

@@ -1,0 +1,65 @@
+{
+  "name": "http-client-runner",
+  "version": "1.0.0",
+  "description": "Execute JetBrains-style .http files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "http-client-runner": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prebuild": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "test": "tsx examples/run-chain.ts && tsx examples/run-import.ts",
+    "test:chain": "tsx examples/run-chain.ts",
+    "test:import": "tsx examples/run-import.ts"
+  },
+  "keywords": [
+    "http",
+    "http-client",
+    "http-file",
+    "jetbrains",
+    "rest",
+    "api",
+    "api-testing",
+    "request-chaining",
+    "http-runner",
+    "axios",
+    "typescript"
+  ],
+  "author": "",
+  "license": "CC-BY-NC-4.0",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "homepage": "",
+  "bugs": {
+    "url": ""
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
