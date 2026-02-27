@@ -24,9 +24,10 @@
     "clean": "rm -rf dist",
     "prebuild": "rm -rf dist",
     "prepublishOnly": "npm run build",
-    "test": "tsx examples/run-chain.ts && tsx examples/run-import.ts",
+    "test": "tsx examples/run-chain.ts && tsx examples/run-import.ts && tsx examples/run-econnrefused.ts",
     "test:chain": "tsx examples/run-chain.ts",
-    "test:import": "tsx examples/run-import.ts"
+    "test:import": "tsx examples/run-import.ts",
+    "test:econnrefused": "tsx examples/run-econnrefused.ts"
   },
   "keywords": [
     "http",

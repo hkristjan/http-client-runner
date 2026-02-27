@@ -98,6 +98,7 @@ async function main(): Promise<void> {
   let totalPassed = 0;
   let totalFailed = 0;
   let totalRequests = 0;
+  let totalFailedRequests = 0;
 
   for (const file of args.files) {
     const resolvedFile = path.resolve(file);
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
     totalPassed += summary.passedTests;
     totalFailed += summary.failedTests;
     totalRequests += summary.executedRequests;
+    totalFailedRequests += summary.failedRequests;
 
     // Print results
     for (const r of results) {
@@ -136,9 +138,12 @@ async function main(): Promise<void> {
     totalPassed + totalFailed > 0
       ? ` | Tests: ${totalPassed} passed, ${totalFailed} failed`
       : '';
-  console.log(`\n  Requests: ${totalRequests}${testLine}\n`);
+  const errorLine = totalFailedRequests > 0
+    ? ` | Request errors: ${totalFailedRequests}`
+    : '';
+  console.log(`\n  Requests: ${totalRequests}${testLine}${errorLine}\n`);
 
-  process.exit(totalFailed > 0 ? 1 : 0);
+  process.exit(totalFailed > 0 || totalFailedRequests > 0 ? 1 : 0);
 }
 
 main().catch((err) => {

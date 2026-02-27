@@ -97,6 +97,8 @@ export interface ExecutionResult {
   testResults: TestResult[];
   logs: string[];
   skipped: boolean;
+  /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
+  networkError: string | null;
 }
 
 /** Per-request result in a run */
@@ -111,6 +113,8 @@ export interface RequestResult {
   testResults: TestResult[];
   logs: string[];
   skipped: boolean;
+  /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
+  networkError: string | null;
 }
 
 /** Summary of an entire run */
@@ -121,6 +125,8 @@ export interface RunSummary {
   totalTests: number;
   passedTests: number;
   failedTests: number;
+  /** Requests that failed at the network level (no HTTP response received). */
+  failedRequests: number;
 }
 
 /** Full result of runFile / runString */

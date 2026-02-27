@@ -78,6 +78,7 @@ export async function executeRequest(
         testResults: [],
         logs: [...client._logs],
         skipped: true,
+        networkError: null,
       };
     }
 
@@ -152,13 +153,19 @@ export async function executeRequest(
 
   // --- Execute request ---
   let response: IHttpResponse;
+  let networkError: string | null = null;
   try {
     const axiosResp = await axios(axiosConfig);
     response = new HttpResponse(axiosResp);
   } catch (err) {
-    response = new HttpErrorResponse(err as AxiosError);
+    const axiosError = err as AxiosError;
+    response = new HttpErrorResponse(axiosError);
+    const message = err instanceof Error ? err.message : String(err);
+    if (!axiosError.response) {
+      // Network-level failure — no HTTP response was received at all
+      networkError = message;
+    }
     if (verbose) {
-      const message = err instanceof Error ? err.message : String(err);
       console.error(`  ✗ Request error: ${message}`);
     }
   }
@@ -211,6 +218,7 @@ export async function executeRequest(
     testResults,
     logs: [...client._logs],
     skipped: false,
+    networkError,
   };
 }
 

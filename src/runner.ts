@@ -180,6 +180,7 @@ async function _runEntries(
           testResults: result.testResults,
           logs: result.logs,
           skipped: result.skipped || false,
+          networkError: result.networkError,
         });
 
         // Clear logs for next entry
@@ -193,6 +194,7 @@ async function _runEntries(
   const allTests: TestResult[] = results.flatMap((r) => r.testResults);
   const passed = allTests.filter((t) => t.passed).length;
   const failed = allTests.filter((t) => !t.passed).length;
+  const failedRequests = results.filter((r) => r.networkError != null).length;
 
   return {
     results,
@@ -203,6 +205,7 @@ async function _runEntries(
       totalTests: allTests.length,
       passedTests: passed,
       failedTests: failed,
+      failedRequests,
     },
     client,
   };
@@ -292,6 +295,7 @@ async function _executeRunDirective(
       testResults: result.testResults,
       logs: result.logs,
       skipped: result.skipped || false,
+      networkError: result.networkError,
     });
 
     // Clear logs for next request
