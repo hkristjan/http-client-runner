@@ -1,6 +1,6 @@
 {
   "name": "http-client-runner",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Execute JetBrains-style .http files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
