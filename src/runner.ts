@@ -17,6 +17,7 @@ import type {
   ParsedEntry,
   ImportDirective,
   RunDirective,
+  VariablesEntry,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,17 @@ async function _runEntries(
 
   for (const entry of entries) {
     switch (entry.kind) {
+      // ---------------------------------------------------------------
+      // @variable = value  (file-level variable definitions)
+      // ---------------------------------------------------------------
+      case 'variables': {
+        const ve = entry as VariablesEntry;
+        for (const [k, v] of Object.entries(ve.values)) {
+          envVars[k] = substituteVariables(v, client.getVariables(), envVars);
+        }
+        break;
+      }
+
       // ---------------------------------------------------------------
       // import other-file.http
       // ---------------------------------------------------------------
@@ -224,16 +236,19 @@ async function _executeRunDirective(
 ): Promise<RequestResult[]> {
   const results: RequestResult[] = [];
 
-  // Build scoped env vars with any (@key=value) overrides.
-  // These are intentionally NOT written to client.global so they
-  // stay scoped to this run directive and don't leak into later requests.
+  // Build scoped env vars for (@key=value) overrides from the run directive
+  // syntax. These overrides are intentionally scoped — they won't propagate
+  // back to the parent. Other variables set during the run (file-level
+  // @var = value defs, request.variables.set() calls) DO propagate back.
   const scopedEnvVars: Record<string, string> = { ...envVars };
+  const overrideKeys = new Set(Object.keys(directive.variableOverrides));
   for (const [k, v] of Object.entries(directive.variableOverrides)) {
     scopedEnvVars[k] = v;
   }
 
   // Collect the request(s) to execute
   let requests: RequestDescriptor[];
+  let runBaseDir: string;
 
   if (directive.requestName) {
     // --- run #RequestName ---
@@ -245,16 +260,32 @@ async function _executeRunDirective(
       return results;
     }
     requests = [found];
+    runBaseDir = baseDir;
   } else if (directive.filePath) {
     // --- run ./file.http ---
-    // Check registry first (maybe it was already imported)
-    let fileRequests = registry.getFileRequests(directive.filePath);
-    if (!fileRequests) {
-      // Parse and register on the fly
-      fileRequests = parseHttpFile(directive.filePath);
+    runBaseDir = path.dirname(directive.filePath);
+    const cached = registry.getFileRequests(directive.filePath);
+    if (cached) {
+      requests = cached;
+    } else {
+      // Parse with full entry support so @var = value definitions are applied
+      const fileEntries = parseHttpFileEntries(directive.filePath);
+      const fileRequests: RequestDescriptor[] = [];
+      for (const entry of fileEntries) {
+        if (entry.kind === 'variables') {
+          // File-level variable definitions propagate to the parent env
+          for (const [k, v] of Object.entries(entry.values)) {
+            const resolved = substituteVariables(v, client.getVariables(), scopedEnvVars);
+            scopedEnvVars[k] = resolved;
+            envVars[k] = resolved;
+          }
+        } else if (entry.kind === 'request') {
+          fileRequests.push(entry.descriptor);
+        }
+      }
       registry.register(directive.filePath, fileRequests);
+      requests = fileRequests;
     }
-    requests = fileRequests;
   } else {
     return results;
   }
@@ -270,10 +301,6 @@ async function _executeRunDirective(
       console.log(`  ${label}`);
       console.log(`${'='.repeat(60)}`);
     }
-
-    const runBaseDir = directive.filePath
-      ? path.dirname(directive.filePath)
-      : baseDir;
 
     const result = await executeRequest(req, client, scopedEnvVars, {
       verbose,
@@ -300,6 +327,15 @@ async function _executeRunDirective(
 
     // Clear logs for next request
     client._logs = [];
+  }
+
+  // Propagate variables back to the parent env. This covers anything set via
+  // request.variables.set() in pre-request scripts during this run. The
+  // intentionally-scoped (@key=value) override variables are excluded.
+  for (const [k, v] of Object.entries(scopedEnvVars)) {
+    if (!overrideKeys.has(k)) {
+      envVars[k] = v;
+    }
   }
 
   return results;

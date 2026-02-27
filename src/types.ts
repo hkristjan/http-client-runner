@@ -186,8 +186,18 @@ export interface RunDirective {
   variableOverrides: Record<string, string>;
 }
 
+/**
+ * File-level variable definitions: `@varName = value`
+ * These set variables in scope for all subsequent requests in the file.
+ */
+export interface VariablesEntry {
+  kind: 'variables';
+  values: Record<string, string>;
+}
+
 /** A parsed entry in an .http file — either a real request or a directive. */
 export type ParsedEntry =
   | { kind: 'request'; descriptor: RequestDescriptor }
   | ImportDirective
-  | RunDirective;
+  | RunDirective
+  | VariablesEntry;

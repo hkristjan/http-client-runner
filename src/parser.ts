@@ -6,6 +6,7 @@ import type {
   ParsedEntry,
   ImportDirective,
   RunDirective,
+  VariablesEntry,
 } from './types';
 
 // ===========================================================================
@@ -64,7 +65,33 @@ export function parseHttpStringEntries(
     }
 
     if (requestLines.length) {
-      const desc = parseRequestBlock(requestLines, baseDir);
+      // Extract @variable = value file-level definitions. These appear before
+      // the HTTP method line (before seenMethod turns true) and are JetBrains-
+      // style file variables that set context for subsequent requests.
+      const fileVars: Record<string, string> = {};
+      const nonVarLines: string[] = [];
+      let seenMethod = false;
+      for (const line of requestLines) {
+        if (!seenMethod) {
+          const trimmed = line.trim();
+          const varMatch = trimmed.match(FILE_VAR_RE);
+          if (varMatch) {
+            fileVars[varMatch[1]] = varMatch[2].trim();
+            continue;
+          }
+          // Any non-blank, non-comment, non-@var line is the start of the request
+          if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('//')) {
+            seenMethod = true;
+          }
+        }
+        nonVarLines.push(line);
+      }
+
+      if (Object.keys(fileVars).length) {
+        entries.push({ kind: 'variables', values: fileVars } satisfies VariablesEntry);
+      }
+
+      const desc = parseRequestBlock(nonVarLines, baseDir);
       if (desc) {
         entries.push({ kind: 'request', descriptor: desc });
       }
@@ -101,6 +128,8 @@ export function parseHttpString(
 
 const IMPORT_RE = /^import\s+(.+\.http)\s*$/;
 const RUN_RE = /^run\s+(.+)$/;
+// JetBrains-style file-level variable: @varName = value
+const FILE_VAR_RE = /^@(\w+)\s*=\s*(.+)$/;
 
 function isDirectiveLine(line: string): boolean {
   const trimmed = line.trim();
@@ -240,6 +269,11 @@ function parseRequestBlock(
   // First pass: strip comments, directives, name, pre-request scripts
   const cleaned: string[] = [];
   let i = 0;
+  // True once we've seen the first non-comment, non-blank, non-directive line
+  // (i.e. the HTTP method/URL line). Until then, blank lines and comment lines
+  // are skipped so a block that contains only comments/directives (no real
+  // request) correctly yields an empty `cleaned` and returns null.
+  let seenRequestContent = false;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -309,12 +343,15 @@ function parseRequestBlock(
       continue;
     }
 
-    // Pure comment lines (# ..., #, //)
-    if (/^\s*(\/\/|#($|\s))/.test(line) && !cleaned.length) {
+    // Skip comment lines and blank lines until we reach actual request content.
+    // Any line starting with # (including #GET, #POST, etc.) is a comment here —
+    // the specific directive patterns above have already been handled.
+    if (!seenRequestContent && (/^\s*(\/\/|#)/.test(line) || !line.trim())) {
       i++;
       continue;
     }
 
+    seenRequestContent = true;
     cleaned.push(line);
     i++;
   }
