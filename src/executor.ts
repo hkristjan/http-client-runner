@@ -2,6 +2,7 @@ import axios, { type AxiosRequestConfig, type AxiosError } from 'axios';
 import * as vm from 'vm';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createRequire } from 'module';
 import { HttpResponse, HttpErrorResponse } from './response';
 import { substituteVariables } from './environment';
 import { HttpClient } from './client';
@@ -71,7 +72,7 @@ export async function executeRequest(
     };
 
     client.resetExit();
-    runScript(request.preRequestScript, { client, request: requestProxy });
+    runScript(request.preRequestScript, { client, request: requestProxy }, baseDir);
     if (client.exited) {
       return {
         response: null,
@@ -209,7 +210,7 @@ export async function executeRequest(
   let testResults: TestResult[] = [];
   if (request.responseHandler) {
     client.resetExit();
-    runScript(request.responseHandler, { client, response });
+    runScript(request.responseHandler, { client, response }, baseDir);
     testResults = await client.runTests();
   }
 
@@ -223,11 +224,171 @@ export async function executeRequest(
 }
 
 /**
+ * Transform ES import statements to require() calls.
+ */
+function transformImports(script: string): string {
+  // Side-effect import: import './mod'
+  script = script.replace(
+    /import\s+(['"])([^'"]+)\1\s*;?/g,
+    (_, quote, specifier) => `require(${quote}${specifier}${quote});`,
+  );
+
+  // Named imports (possibly multi-line): import { a, b } from './mod'
+  script = script.replace(
+    /import\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2\s*;?/g,
+    (_, names, quote, specifier) => {
+      const cleaned = names.replace(/\s+/g, ' ').trim();
+      return `const { ${cleaned} } = require(${quote}${specifier}${quote});`;
+    },
+  );
+
+  // Default import: import foo from './mod'
+  script = script.replace(
+    /import\s+([a-zA-Z_$][\w$]*)\s+from\s*(['"])([^'"]+)\2\s*;?/g,
+    (_, name, quote, specifier) => {
+      const req = `require(${quote}${specifier}${quote})`;
+      return `const ${name} = ${req}.default ?? ${req};`;
+    },
+  );
+
+  // Namespace import: import * as ns from './mod'
+  script = script.replace(
+    /import\s*\*\s*as\s+([a-zA-Z_$][\w$]*)\s+from\s*(['"])([^'"]+)\2\s*;?/g,
+    (_, name, quote, specifier) =>
+      `const ${name} = require(${quote}${specifier}${quote});`,
+  );
+
+  return script;
+}
+
+/**
+ * Transform ES export syntax to CJS module.exports assignments.
+ */
+function transformExports(content: string): string {
+  const deferred: string[] = [];
+
+  // export default ...
+  content = content.replace(
+    /export\s+default\s+/g,
+    'module.exports.default = ',
+  );
+
+  // export { a, b }
+  content = content.replace(
+    /export\s*\{([^}]*)\}\s*;?/g,
+    (_, names: string) => {
+      return names
+        .split(',')
+        .map((n: string) => n.trim())
+        .filter(Boolean)
+        .map((n: string) => `module.exports.${n} = ${n};`)
+        .join(' ');
+    },
+  );
+
+  // export function foo(...)
+  content = content.replace(
+    /export\s+function\s+([a-zA-Z_$][\w$]*)/g,
+    (_, name) => {
+      deferred.push(`module.exports.${name} = ${name};`);
+      return `function ${name}`;
+    },
+  );
+
+  // export class Foo
+  content = content.replace(
+    /export\s+class\s+([a-zA-Z_$][\w$]*)/g,
+    (_, name) => {
+      deferred.push(`module.exports.${name} = ${name};`);
+      return `class ${name}`;
+    },
+  );
+
+  // export const/let/var x = ...
+  content = content.replace(
+    /export\s+(const|let|var)\s+([a-zA-Z_$][\w$]*)/g,
+    (_, kind, name) => {
+      deferred.push(`module.exports.${name} = ${name};`);
+      return `${kind} ${name}`;
+    },
+  );
+
+  if (deferred.length > 0) {
+    content += '\n' + deferred.join('\n');
+  }
+
+  return content;
+}
+
+/**
+ * Check if source code contains ES module syntax.
+ */
+function hasESMSyntax(source: string): boolean {
+  return /\b(import\s+|export\s+(default\s+|function\s+|class\s+|const\s+|let\s+|var\s+|\{))/.test(source);
+}
+
+/**
+ * Create a require function for the VM sandbox that can load local files
+ * with ESM syntax and delegate bare specifiers to Node's require.
+ */
+function createSandboxRequire(baseDir: string): (specifier: string) => unknown {
+  const nodeRequire = createRequire(path.resolve(baseDir, '__placeholder.js'));
+
+  return function sandboxRequire(specifier: string): unknown {
+    // Relative paths: load and optionally transform ESM → CJS
+    if (specifier.startsWith('./') || specifier.startsWith('../')) {
+      const resolved = path.resolve(baseDir, specifier);
+      // Try with .js extension if no extension
+      let filePath = resolved;
+      if (!fs.existsSync(filePath) && !path.extname(filePath)) {
+        filePath = resolved + '.js';
+      }
+      if (!fs.existsSync(filePath) && path.extname(resolved) === '.js') {
+        // Try .ts as well
+        filePath = resolved.replace(/\.js$/, '.ts');
+      }
+
+      const source = fs.readFileSync(filePath, 'utf-8');
+
+      if (hasESMSyntax(source)) {
+        let transformed = transformImports(source);
+        transformed = transformExports(transformed);
+
+        const moduleObj = { exports: {} as Record<string, unknown> };
+        const childCtx = vm.createContext({
+          module: moduleObj,
+          exports: moduleObj.exports,
+          require: createSandboxRequire(path.dirname(filePath)),
+          __filename: filePath,
+          __dirname: path.dirname(filePath),
+          console,
+        });
+        vm.runInContext(transformed, childCtx, { timeout: 10000 });
+        return moduleObj.exports;
+      }
+
+      // Plain CJS — delegate to Node's require
+      return nodeRequire(specifier);
+    }
+
+    // Bare specifiers (node_modules, built-ins) — delegate to Node
+    return nodeRequire(specifier);
+  };
+}
+
+/**
  * Run a JS script string in a sandboxed VM context.
  */
-function runScript(script: string, sandbox: ScriptSandbox): void {
+function runScript(
+  script: string,
+  sandbox: ScriptSandbox,
+  baseDir?: string,
+): void {
+  const transformed = transformImports(script);
+
   const ctx = vm.createContext({
     ...sandbox,
+    ...(baseDir ? { require: createSandboxRequire(baseDir) } : {}),
     console: {
       log: (...args: unknown[]) =>
         sandbox.client.log(args.map(String).join(' ')),
@@ -239,7 +400,7 @@ function runScript(script: string, sandbox: ScriptSandbox): void {
   });
 
   try {
-    vm.runInContext(script, ctx, { timeout: 10000 });
+    vm.runInContext(transformed, ctx, { timeout: 10000 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sandbox.client.log(`[Script error] ${message}`);
