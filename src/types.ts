@@ -1,4 +1,3 @@
-import type { AxiosResponse } from 'axios';
 import type { HttpClientRunner } from './client';
 
 /** Cache directive parsed from `# @cache(ttl=30000)` or `# @cache(ttl=30000, key=foo)` */
