@@ -91,7 +91,7 @@ Executes all requests in a `.http` file sequentially.
 | `environment` | `string` | Environment name to load from `http-client.env.json` |
 | `variables` | `Record<string, string>` | Additional variables to inject (e.g. `{ host: 'http://localhost:3000' }`) |
 | `verbose` | `boolean` | Print request/response info to stdout |
-| `client` | `HttpClient` | Reuse an existing client instance (shares global variables across runs) |
+| `client` | `HttpClientRunner` | Reuse an existing client instance (shares global variables across runs) |
 
 **Returns `RunResult`:**
 
@@ -99,7 +99,7 @@ Executes all requests in a `.http` file sequentially.
 interface RunResult {
   results: RequestResult[];
   summary: RunSummary;
-  client: HttpClient;
+  client: HttpClientRunner;
 }
 
 interface RunSummary {
@@ -142,14 +142,14 @@ Full parser that returns all entries including `import`/`run` directives alongsi
 
 Same as `parseHttpFileEntries` but takes a string.
 
-### `HttpClient`
+### `HttpClientRunner`
 
 Create a standalone client to share state across multiple file runs:
 
 ```ts
-import { HttpClient, runFile } from 'http-client-runner';
+import { HttpClientRunner, runFile } from 'http-client-runner';
 
-const client = new HttpClient({ verbose: true });
+const client = new HttpClientRunner({ verbose: true });
 
 // Run auth file first – sets tokens in client.global
 await runFile('./auth.http', { client });
@@ -171,7 +171,7 @@ import type {
   RequestDescriptor,
   TestResult,
   IHttpResponse,
-  HttpClientOptions,
+  HttpClientRunnerOptions,
   ParsedEntry,
   ImportDirective,
   RunDirective,
@@ -404,10 +404,10 @@ GET {{host}}/api/users/{{userId}}
 
 Only successful responses (2xx) are cached. Network errors and non-2xx responses are never stored.
 
-**Custom cache adapter** — provide your own `CacheAdapter` implementation (e.g. Redis, filesystem) via the `HttpClient` constructor:
+**Custom cache adapter** — provide your own `CacheAdapter` implementation (e.g. Redis, filesystem) via the `HttpClientRunner` constructor:
 
 ```ts
-import { HttpClient, runFile } from 'http-client-runner';
+import { HttpClientRunner, runFile } from 'http-client-runner';
 import type { CacheAdapter } from 'http-client-runner';
 
 const redisCache: CacheAdapter = {
@@ -417,7 +417,7 @@ const redisCache: CacheAdapter = {
   async clear() { /* ... */ },
 };
 
-const client = new HttpClient({ cacheAdapter: redisCache });
+const client = new HttpClientRunner({ cacheAdapter: redisCache });
 await runFile('./api.http', { client });
 ```
 

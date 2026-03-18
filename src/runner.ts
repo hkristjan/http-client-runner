@@ -5,7 +5,7 @@ import {
   parseHttpFileEntries,
   parseHttpStringEntries,
 } from './parser';
-import { HttpClient } from './client';
+import { HttpClientRunner } from './client';
 import { loadEnvironment, substituteVariables } from './environment';
 import { executeRequest } from './executor';
 import type {
@@ -97,7 +97,7 @@ async function _runEntries(
     verbose = false,
   } = options;
 
-  const client = options.client || new HttpClient({ verbose });
+  const client = options.client || new HttpClientRunner({ verbose });
 
   // Load environment variables
   const envVars: Record<string, string> = {
@@ -230,7 +230,7 @@ async function _runEntries(
 async function _executeRunDirective(
   directive: RunDirective,
   registry: ImportRegistry,
-  client: HttpClient,
+  client: HttpClientRunner,
   envVars: Record<string, string>,
   baseDir: string,
   verbose: boolean,

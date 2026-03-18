@@ -28,15 +28,15 @@ The library executes JetBrains-style `.http` files. The pipeline is:
 
 **`executor.ts`** — Executes individual requests via axios. Substitutes variables in URLs/headers/body, runs pre/post scripts in `vm.createContext()`, handles response file redirects (`>>` / `>>!`).
 
-**`client.ts`** — `HttpClient` class holds shared mutable state across all requests: `client.global` variables, headers, test results, logs. A single instance is shared across multiple file runs for state preservation.
+**`client.ts`** — `HttpClientRunner` class holds shared mutable state across all requests: `client.global` variables, headers, test results, logs. A single instance is shared across multiple file runs for state preservation.
 
 **`environment.ts`** — Loads `http-client.env.json` / `http-client.private.env.json`. Variable resolution priority: client globals → env file → built-in dynamics (`$uuid`, `$timestamp`, `$isoTimestamp`, `$randomInt`) → `process.env`.
 
 **`response.ts`** — Wraps axios responses into `IHttpResponse` / `IHttpErrorResponse`. HTTP errors (4xx/5xx) don't throw; network errors are converted to error responses.
 
-**`index.ts`** — Public API: `runFile`, `runString`, `parseHttpFile`, `parseHttpString`, `parseHttpFileEntries`, `parseHttpStringEntries`, `HttpClient`, `loadEnvironment`, `substituteVariables`.
+**`index.ts`** — Public API: `runFile`, `runString`, `parseHttpFile`, `parseHttpString`, `parseHttpFileEntries`, `parseHttpStringEntries`, `HttpClientRunner`, `loadEnvironment`, `substituteVariables`.
 
-**`cli.ts`** — CLI entry point (`http-client-runner` bin). Creates a single `HttpClient` instance shared across all input files. Exits with code 1 if any tests fail.
+**`cli.ts`** — CLI entry point (`http-client-runner` bin). Creates a single `HttpClientRunner` instance shared across all input files. Exits with code 1 if any tests fail.
 
 ## Key design notes
 

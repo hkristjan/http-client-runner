@@ -6,7 +6,7 @@ import { createRequire } from 'module';
 import { HttpResponse, HttpErrorResponse, CachedHttpResponse } from './response';
 import { substituteVariables } from './environment';
 import { computeCacheKey } from './cache';
-import { HttpClient } from './client';
+import { HttpClientRunner } from './client';
 import type {
   RequestDescriptor,
   ExecutionResult,
@@ -23,7 +23,7 @@ import type {
  */
 export async function executeRequest(
   request: RequestDescriptor,
-  client: HttpClient,
+  client: HttpClientRunner,
   envVars: Record<string, string>,
   options: ExecuteOptions = {},
 ): Promise<ExecutionResult> {
@@ -275,7 +275,7 @@ export async function executeRequest(
 function writeResponseRedirect(
   request: RequestDescriptor,
   response: IHttpResponse,
-  client: HttpClient,
+  client: HttpClientRunner,
   envVars: Record<string, string>,
   baseDir: string,
 ): void {

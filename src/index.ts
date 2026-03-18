@@ -5,7 +5,7 @@ export {
   parseHttpFileEntries,
   parseHttpStringEntries,
 } from './parser';
-export { HttpClient } from './client';
+export { HttpClientRunner } from './client';
 export { loadEnvironment, substituteVariables } from './environment';
 export { MemoryCacheAdapter } from './cache';
 
@@ -27,7 +27,7 @@ export type {
   RunResult,
   RunOptions,
   ExecuteOptions,
-  HttpClientOptions,
+  HttpClientRunnerRunnerOptions,
   EnvironmentFile,
   ImportDirective,
   RunDirective,

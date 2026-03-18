@@ -3,7 +3,7 @@ import type {
   CacheAdapter,
   ClientGlobal,
   ClientGlobalHeaders,
-  HttpClientOptions,
+  HttpClientRunnerRunnerOptions,
   TestResult,
 } from './types';
 
@@ -23,7 +23,7 @@ import type {
  *   client.log(text)
  *   client.exit()
  */
-export class HttpClient {
+export class HttpClientRunner {
   private _variables: Map<string, unknown> = new Map();
   private _headers: Map<string, string> = new Map();
   private _tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
@@ -40,7 +40,7 @@ export class HttpClient {
     clear(): Promise<void>;
   };
 
-  constructor(options: HttpClientOptions = {}) {
+  constructor(options: HttpClientRunnerRunnerOptions = {}) {
     this._verbose = options.verbose ?? false;
     this._cacheAdapter = options.cacheAdapter ?? new MemoryCacheAdapter();
     this.cache = {

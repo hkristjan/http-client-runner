@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios';
-import type { HttpClient } from './client';
+import type { HttpClientRunner } from './client';
 
 /** Cache directive parsed from `# @cache(ttl=30000)` or `# @cache(ttl=30000, key=foo)` */
 export interface CacheDirective {
@@ -109,7 +109,7 @@ export interface RequestProxy {
 
 /** Script sandbox context */
 export interface ScriptSandbox {
-  client: HttpClient;
+  client: HttpClientRunner;
   response?: IHttpResponse;
   request?: RequestProxy;
 }
@@ -158,7 +158,7 @@ export interface RunSummary {
 export interface RunResult {
   results: RequestResult[];
   summary: RunSummary;
-  client: HttpClient;
+  client: HttpClientRunner;
 }
 
 /** Options for runFile / runString */
@@ -166,7 +166,7 @@ export interface RunOptions {
   environment?: string;
   variables?: Record<string, string>;
   verbose?: boolean;
-  client?: HttpClient;
+  client?: HttpClientRunner;
   baseDir?: string;
 }
 
@@ -176,8 +176,8 @@ export interface ExecuteOptions {
   baseDir?: string;
 }
 
-/** Options for HttpClient constructor */
-export interface HttpClientOptions {
+/** Options for HttpClientRunner constructor */
+export interface HttpClientRunnerRunnerOptions {
   verbose?: boolean;
   cacheAdapter?: CacheAdapter;
 }

@@ -2,7 +2,7 @@
 
 import * as path from 'path';
 import { runFile } from './runner';
-import { HttpClient } from './client';
+import { HttpClientRunner } from './client';
 
 // ---------------------------------------------------------------------------
 // CLI — run .http files from the terminal
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const client = new HttpClient({ verbose: args.verbose });
+  const client = new HttpClientRunner({ verbose: args.verbose });
   let totalPassed = 0;
   let totalFailed = 0;
   let totalRequests = 0;
