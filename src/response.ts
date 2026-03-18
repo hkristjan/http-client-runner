@@ -1,5 +1,5 @@
 import type { AxiosResponse, AxiosError } from 'axios';
-import type { ContentType, ResponseHeaders, IHttpResponse } from './types';
+import type { ContentType, ResponseHeaders, IHttpResponse, CachedResponse } from './types';
 
 /**
  * Wraps an axios response to match the JetBrains HTTP Client `response` object.
@@ -48,6 +48,46 @@ export class HttpResponse implements IHttpResponse {
   static _extractCharset(contentType: string): string | null {
     const match = contentType.match(/charset=([^\s;]+)/i);
     return match ? match[1] : null;
+  }
+
+  /** Extract raw headers for caching. */
+  getRawHeaders(): Record<string, string | string[]> {
+    const result: Record<string, string | string[]> = {};
+    for (const [key, val] of Object.entries(this._raw.headers)) {
+      if (val != null) {
+        result[key] = val as string | string[];
+      }
+    }
+    return result;
+  }
+}
+
+/**
+ * Wraps a CachedResponse into an IHttpResponse for cache hits.
+ */
+export class CachedHttpResponse implements IHttpResponse {
+  public status: number;
+  public body: unknown;
+  public contentType: ContentType;
+  public headers: ResponseHeaders;
+
+  constructor(cached: CachedResponse) {
+    this.status = cached.status;
+    this.body = cached.body;
+    this.contentType = cached.contentType;
+    this.headers = {
+      valueOf: (name: string): string | null => {
+        const val = cached.headers[name.toLowerCase()];
+        if (val == null) return null;
+        if (Array.isArray(val)) return val[0];
+        return val;
+      },
+      valuesOf: (name: string): string[] => {
+        const val = cached.headers[name.toLowerCase()];
+        if (val == null) return [];
+        return Array.isArray(val) ? val : [val];
+      },
+    };
   }
 }
 

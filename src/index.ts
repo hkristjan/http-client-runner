@@ -7,6 +7,7 @@ export {
 } from './parser';
 export { HttpClient } from './client';
 export { loadEnvironment, substituteVariables } from './environment';
+export { MemoryCacheAdapter } from './cache';
 
 // Re-export all types
 export type {
@@ -31,4 +32,7 @@ export type {
   ImportDirective,
   RunDirective,
   ParsedEntry,
+  CacheAdapter,
+  CachedResponse,
+  CacheDirective,
 } from './types';

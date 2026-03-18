@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/http-client-runner.svg)](https://www.npmjs.com/package/http-client-runner)
 [![license](https://img.shields.io/npm/l/http-client-runner.svg)](https://github.com/hkristjan/http-client-runner/blob/main/LICENSE)
 
-Execute JetBrains-style `.http` files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments.
+Execute JetBrains-style `.http` files programmatically with axios — supports request chaining, JS handlers, variables, imports, environments, and response caching.
 
 Use it as a **library** in your Node.js/TypeScript code, or as a **CLI** to run `.http` files directly from the terminal.
 
@@ -175,6 +175,9 @@ import type {
   ParsedEntry,
   ImportDirective,
   RunDirective,
+  CacheAdapter,
+  CachedResponse,
+  CacheDirective,
 } from 'http-client-runner';
 ```
 
@@ -364,6 +367,59 @@ GET https://api.example.com/slow-endpoint
 | `@no-cookie-jar` | Don't store cookies |
 | `@timeout <value> <unit>` | Read timeout (ms, s, m) |
 | `@connection-timeout <value> <unit>` | Connection timeout |
+| `@cache(ttl=<ms>)` | Cache the response for the given TTL (milliseconds) |
+| `@cache(ttl=<ms>, key=<name>)` | Cache with an explicit key (useful for invalidation) |
+
+### Response Caching
+
+Add a `@cache` directive to avoid repeated network calls for the same request. Cached responses are stored in memory by default and expire after the specified TTL.
+
+**Auto-keyed cache** — the cache key is derived from method, URL, headers, and body:
+
+```http
+# @cache(ttl=30000)
+GET {{host}}/api/config
+```
+
+**Named cache key** — use an explicit key so you can reference or invalidate it:
+
+```http
+# @cache(ttl=30000, key=user-profile)
+GET {{host}}/api/users/{{userId}}
+```
+
+When a cache hit occurs, the stored response is returned without making a network request. Post-response handlers and response redirects still run on cached responses, so your test assertions and variable extraction work the same way.
+
+**Cache invalidation from scripts** — use `client.cache.delete(key)` or `client.cache.clear()` in pre-request or post-response handlers:
+
+```http
+# @cache(ttl=30000, key=user-profile)
+GET {{host}}/api/users/{{userId}}
+
+< {%
+  // Force a fresh request by clearing the cached entry
+  client.cache.delete("user-profile");
+%}
+```
+
+Only successful responses (2xx) are cached. Network errors and non-2xx responses are never stored.
+
+**Custom cache adapter** — provide your own `CacheAdapter` implementation (e.g. Redis, filesystem) via the `HttpClient` constructor:
+
+```ts
+import { HttpClient, runFile } from 'http-client-runner';
+import type { CacheAdapter } from 'http-client-runner';
+
+const redisCache: CacheAdapter = {
+  async get(key) { /* ... */ },
+  async set(key, value, ttlMs) { /* ... */ },
+  async delete(key) { /* ... */ },
+  async clear() { /* ... */ },
+};
+
+const client = new HttpClient({ cacheAdapter: redisCache });
+await runFile('./api.http', { client });
+```
 
 ### Response Redirect to File
 

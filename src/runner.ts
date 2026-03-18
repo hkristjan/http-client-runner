@@ -193,6 +193,7 @@ async function _runEntries(
           logs: result.logs,
           skipped: result.skipped || false,
           networkError: result.networkError,
+          cached: result.cached ?? false,
         });
 
         // Clear logs for next entry
@@ -323,6 +324,7 @@ async function _executeRunDirective(
       logs: result.logs,
       skipped: result.skipped || false,
       networkError: result.networkError,
+      cached: result.cached ?? false,
     });
 
     // Clear logs for next request

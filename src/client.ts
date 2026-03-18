@@ -1,4 +1,6 @@
+import { MemoryCacheAdapter } from './cache';
 import type {
+  CacheAdapter,
   ClientGlobal,
   ClientGlobalHeaders,
   HttpClientOptions,
@@ -28,11 +30,23 @@ export class HttpClient {
   public _logs: string[] = [];
   private _verbose: boolean;
   private _exited: boolean = false;
+  private _cacheAdapter: CacheAdapter;
 
   public global: ClientGlobal;
 
+  /** Restricted cache access for script sandboxes. */
+  public cache: {
+    delete(key: string): Promise<boolean>;
+    clear(): Promise<void>;
+  };
+
   constructor(options: HttpClientOptions = {}) {
     this._verbose = options.verbose ?? false;
+    this._cacheAdapter = options.cacheAdapter ?? new MemoryCacheAdapter();
+    this.cache = {
+      delete: (key: string) => this._cacheAdapter.delete(key),
+      clear: () => this._cacheAdapter.clear(),
+    };
 
     this.global = {
       set: (name: string, value: unknown): void => {
@@ -117,5 +131,10 @@ export class HttpClient {
   /** Reset exit flag for next request. */
   resetExit(): void {
     this._exited = false;
+  }
+
+  /** Get the cache adapter (used by executor). */
+  getCacheAdapter(): CacheAdapter {
+    return this._cacheAdapter;
   }
 }

@@ -1,6 +1,28 @@
 import type { AxiosResponse } from 'axios';
 import type { HttpClient } from './client';
 
+/** Cache directive parsed from `# @cache(ttl=30000)` or `# @cache(ttl=30000, key=foo)` */
+export interface CacheDirective {
+  ttl: number;
+  key?: string;
+}
+
+/** Stored cached response data */
+export interface CachedResponse {
+  status: number;
+  body: unknown;
+  headers: Record<string, string | string[]>;
+  contentType: ContentType;
+}
+
+/** Pluggable cache adapter interface */
+export interface CacheAdapter {
+  get(key: string): Promise<CachedResponse | undefined>;
+  set(key: string, value: CachedResponse, ttlMs: number): Promise<void>;
+  delete(key: string): Promise<boolean>;
+  clear(): Promise<void>;
+}
+
 /** Parsed request descriptor from an .http file */
 export interface RequestDescriptor {
   name: string | null;
@@ -14,6 +36,7 @@ export interface RequestDescriptor {
   directives: Set<string>;
   timeout: number | null;
   connectionTimeout: number | null;
+  cache: CacheDirective | null;
 }
 
 export interface ResponseRedirect {
@@ -99,6 +122,7 @@ export interface ExecutionResult {
   skipped: boolean;
   /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
   networkError: string | null;
+  cached: boolean;
 }
 
 /** Per-request result in a run */
@@ -115,6 +139,7 @@ export interface RequestResult {
   skipped: boolean;
   /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
   networkError: string | null;
+  cached: boolean;
 }
 
 /** Summary of an entire run */
@@ -154,6 +179,7 @@ export interface ExecuteOptions {
 /** Options for HttpClient constructor */
 export interface HttpClientOptions {
   verbose?: boolean;
+  cacheAdapter?: CacheAdapter;
 }
 
 /** Environment file structure */
