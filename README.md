@@ -171,7 +171,7 @@ import type {
   RequestDescriptor,
   TestResult,
   IHttpResponse,
-  HttpClientRunnerOptions,
+  HttpClientRunnerRunnerOptions,
   ParsedEntry,
   ImportDirective,
   RunDirective,
