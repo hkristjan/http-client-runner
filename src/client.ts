@@ -123,6 +123,11 @@ export class HttpClientRunner {
     return Object.fromEntries(this._headers);
   }
 
+  /** Whether verbose logging is enabled. */
+  get verbose(): boolean {
+    return this._verbose;
+  }
+
   /** Check if exit() was called. */
   get exited(): boolean {
     return this._exited;

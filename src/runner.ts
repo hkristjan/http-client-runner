@@ -94,10 +94,10 @@ async function _runEntries(
   const {
     environment: envName,
     variables: extraVars = {},
-    verbose = false,
   } = options;
 
-  const client = options.client || new HttpClientRunner({ verbose });
+  const client = options.client || new HttpClientRunner({ verbose: options.verbose });
+  const verbose = options.verbose ?? client.verbose;
 
   // Load environment variables
   const envVars: Record<string, string> = {
