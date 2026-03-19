@@ -76,6 +76,7 @@ export async function executeRequest(
 
     client.resetExit();
     runScript(request.preRequestScript, { client, request: requestProxy }, baseDir);
+    await client.flushCacheOps();
     if (client.exited) {
       return {
         response: null,
@@ -131,6 +132,7 @@ export async function executeRequest(
       if (request.responseHandler) {
         client.resetExit();
         runScript(request.responseHandler, { client, response }, baseDir);
+        await client.flushCacheOps();
         testResults = await client.runTests();
       }
 
@@ -255,6 +257,7 @@ export async function executeRequest(
   if (request.responseHandler) {
     client.resetExit();
     runScript(request.responseHandler, { client, response }, baseDir);
+    await client.flushCacheOps();
     testResults = await client.runTests();
   }
 

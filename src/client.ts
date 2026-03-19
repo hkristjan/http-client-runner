@@ -31,6 +31,7 @@ export class HttpClientRunner {
   private _verbose: boolean;
   private _exited: boolean = false;
   private _cacheAdapter: CacheAdapter;
+  private _pendingCacheOps: Promise<unknown>[] = [];
 
   public global: ClientGlobal;
 
@@ -44,8 +45,16 @@ export class HttpClientRunner {
     this._verbose = options.verbose ?? false;
     this._cacheAdapter = options.cacheAdapter ?? new MemoryCacheAdapter();
     this.cache = {
-      delete: (key: string) => this._cacheAdapter.delete(key),
-      clear: () => this._cacheAdapter.clear(),
+      delete: (key: string) => {
+        const p = this._cacheAdapter.delete(key);
+        this._pendingCacheOps.push(p);
+        return p;
+      },
+      clear: () => {
+        const p = this._cacheAdapter.clear();
+        this._pendingCacheOps.push(p);
+        return p;
+      },
     };
 
     this.global = {
@@ -141,5 +150,12 @@ export class HttpClientRunner {
   /** Get the cache adapter (used by executor). */
   getCacheAdapter(): CacheAdapter {
     return this._cacheAdapter;
+  }
+
+  /** Await any pending cache operations queued by script sandboxes. */
+  async flushCacheOps(): Promise<void> {
+    if (this._pendingCacheOps.length === 0) return;
+    await Promise.all(this._pendingCacheOps);
+    this._pendingCacheOps = [];
   }
 }
