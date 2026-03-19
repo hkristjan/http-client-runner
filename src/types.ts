@@ -176,7 +176,7 @@ export interface ExecuteOptions {
 }
 
 /** Options for HttpClientRunner constructor */
-export interface HttpClientRunnerRunnerOptions {
+export interface HttpClientRunnerOptions {
   verbose?: boolean;
   cacheAdapter?: CacheAdapter;
 }

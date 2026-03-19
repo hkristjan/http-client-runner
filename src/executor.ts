@@ -14,6 +14,7 @@ import type {
   ScriptSandbox,
   RequestProxy,
   IHttpResponse,
+  CacheAdapter,
   CachedResponse,
   TestResult,
 } from './types';
@@ -101,18 +102,18 @@ export async function executeRequest(
   }
 
   // --- Cache check (after pre-request script, using resolved values) ---
-  let cached = false;
+  let cacheKey: string | undefined;
+  let cacheAdapter: CacheAdapter | undefined;
   if (request.cache) {
     if (verbose) {
       console.log(`  [cache] Cache directive detected (ttl=${request.cache.ttl}ms${request.cache.key ? `, key=${request.cache.key}` : ''})`);
     }
-    const adapter = client.getCacheAdapter();
-    const cacheKey = request.cache.key
+    cacheAdapter = client.getCacheAdapter();
+    cacheKey = request.cache.key
       ? substituteVariables(request.cache.key, client.getVariables(), envVars)
       : computeCacheKey(request.method, url, headers, body);
-    const hit = await adapter.get(cacheKey);
+    const hit = await cacheAdapter.get(cacheKey);
     if (hit) {
-      cached = true;
       const response: IHttpResponse = new CachedHttpResponse(hit);
       if (verbose) {
         console.log(`\n→ ${request.method} ${url}`);
@@ -224,23 +225,21 @@ export async function executeRequest(
 
   // --- Cache store (only 2xx, no network error) ---
   if (
+    cacheKey &&
+    cacheAdapter &&
     request.cache &&
     !networkError &&
     response.status >= 200 &&
     response.status < 300 &&
     response instanceof HttpResponse
   ) {
-    const adapter = client.getCacheAdapter();
-    const cacheKey = request.cache.key
-      ? substituteVariables(request.cache.key, client.getVariables(), envVars)
-      : computeCacheKey(request.method, url, headers, body);
     const toCache: CachedResponse = {
       status: response.status,
       body: response.body,
       headers: response.getRawHeaders(),
       contentType: response.contentType,
     };
-    await adapter.set(cacheKey, toCache, request.cache.ttl);
+    await cacheAdapter.set(cacheKey, toCache, request.cache.ttl);
     if (verbose) {
       console.log(`  [cache] Stored response in cache (ttl=${request.cache.ttl}ms)`);
     }

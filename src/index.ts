@@ -27,7 +27,7 @@ export type {
   RunResult,
   RunOptions,
   ExecuteOptions,
-  HttpClientRunnerRunnerOptions,
+  HttpClientRunnerOptions,
   EnvironmentFile,
   ImportDirective,
   RunDirective,

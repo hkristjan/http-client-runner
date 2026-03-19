@@ -3,7 +3,7 @@ import type {
   CacheAdapter,
   ClientGlobal,
   ClientGlobalHeaders,
-  HttpClientRunnerRunnerOptions,
+  HttpClientRunnerOptions,
   TestResult,
 } from './types';
 
@@ -40,7 +40,7 @@ export class HttpClientRunner {
     clear(): Promise<void>;
   };
 
-  constructor(options: HttpClientRunnerRunnerOptions = {}) {
+  constructor(options: HttpClientRunnerOptions = {}) {
     this._verbose = options.verbose ?? false;
     this._cacheAdapter = options.cacheAdapter ?? new MemoryCacheAdapter();
     this.cache = {
