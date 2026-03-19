@@ -3,9 +3,10 @@ import * as vm from 'vm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createRequire } from 'module';
-import { HttpResponse, HttpErrorResponse } from './response';
+import { HttpResponse, HttpErrorResponse, CachedHttpResponse } from './response';
 import { substituteVariables } from './environment';
-import { HttpClient } from './client';
+import { computeCacheKey } from './cache';
+import { HttpClientRunner } from './client';
 import type {
   RequestDescriptor,
   ExecutionResult,
@@ -13,6 +14,8 @@ import type {
   ScriptSandbox,
   RequestProxy,
   IHttpResponse,
+  CacheAdapter,
+  CachedResponse,
   TestResult,
 } from './types';
 
@@ -21,7 +24,7 @@ import type {
  */
 export async function executeRequest(
   request: RequestDescriptor,
-  client: HttpClient,
+  client: HttpClientRunner,
   envVars: Record<string, string>,
   options: ExecuteOptions = {},
 ): Promise<ExecutionResult> {
@@ -73,6 +76,7 @@ export async function executeRequest(
 
     client.resetExit();
     runScript(request.preRequestScript, { client, request: requestProxy }, baseDir);
+    await client.flushCacheOps();
     if (client.exited) {
       return {
         response: null,
@@ -80,6 +84,7 @@ export async function executeRequest(
         logs: [...client._logs],
         skipped: true,
         networkError: null,
+        cached: false,
       };
     }
 
@@ -95,6 +100,51 @@ export async function executeRequest(
     body = request.body
       ? substituteVariables(request.body, updatedClientVars, envVars)
       : undefined;
+  }
+
+  // --- Cache check (after pre-request script, using resolved values) ---
+  let cacheKey: string | undefined;
+  let cacheAdapter: CacheAdapter | undefined;
+  if (request.cache) {
+    if (verbose) {
+      console.log(`  [cache] Cache directive detected (ttl=${request.cache.ttl}ms${request.cache.key ? `, key=${request.cache.key}` : ''})`);
+    }
+    cacheAdapter = client.getCacheAdapter();
+    cacheKey = request.cache.key
+      ? substituteVariables(request.cache.key, client.getVariables(), envVars)
+      : computeCacheKey(request.method, url, headers, body);
+    const hit = await cacheAdapter.get(cacheKey);
+    if (hit) {
+      const response: IHttpResponse = new CachedHttpResponse(hit);
+      if (verbose) {
+        console.log(`\n→ ${request.method} ${url}`);
+        console.log(`  [cached] Using cached response for ${url}`);
+        console.log(`  ← ${response.status} ${response.contentType.mimeType}`);
+      }
+
+      // Response redirect still runs on cache hit
+      if (request.responseRedirect) {
+        writeResponseRedirect(request, response, client, envVars, baseDir);
+      }
+
+      // Post-response handler still runs on cache hit
+      let testResults: TestResult[] = [];
+      if (request.responseHandler) {
+        client.resetExit();
+        runScript(request.responseHandler, { client, response }, baseDir);
+        await client.flushCacheOps();
+        testResults = await client.runTests();
+      }
+
+      return {
+        response,
+        testResults,
+        logs: [...client._logs],
+        skipped: false,
+        networkError: null,
+        cached: true,
+      };
+    }
   }
 
   // --- Detect JSON body ---
@@ -175,35 +225,31 @@ export async function executeRequest(
     console.log(`  ← ${response.status} ${response.contentType.mimeType}`);
   }
 
+  // --- Cache store (only 2xx, no network error) ---
+  if (
+    cacheKey &&
+    cacheAdapter &&
+    request.cache &&
+    !networkError &&
+    response.status >= 200 &&
+    response.status < 300 &&
+    response instanceof HttpResponse
+  ) {
+    const toCache: CachedResponse = {
+      status: response.status,
+      body: response.body,
+      headers: response.getRawHeaders(),
+      contentType: response.contentType,
+    };
+    await cacheAdapter.set(cacheKey, toCache, request.cache.ttl);
+    if (verbose) {
+      console.log(`  [cache] Stored response in cache (ttl=${request.cache.ttl}ms)`);
+    }
+  }
+
   // --- Response redirect (>> file) ---
   if (request.responseRedirect) {
-    const outPath = path.resolve(
-      baseDir,
-      substituteVariables(
-        request.responseRedirect.path,
-        client.getVariables(),
-        envVars,
-      ),
-    );
-    const content =
-      typeof response.body === 'object'
-        ? JSON.stringify(response.body, null, 2)
-        : String(response.body);
-    if (request.responseRedirect.overwrite || !fs.existsSync(outPath)) {
-      fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      fs.writeFileSync(outPath, content, 'utf-8');
-    } else {
-      // Append numeric suffix
-      const ext = path.extname(outPath);
-      const base = outPath.slice(0, -ext.length || undefined);
-      let i = 1;
-      let candidate = `${base}_${i}${ext}`;
-      while (fs.existsSync(candidate)) {
-        i++;
-        candidate = `${base}_${i}${ext}`;
-      }
-      fs.writeFileSync(candidate, content, 'utf-8');
-    }
+    writeResponseRedirect(request, response, client, envVars, baseDir);
   }
 
   // --- Response handler script ---
@@ -211,6 +257,7 @@ export async function executeRequest(
   if (request.responseHandler) {
     client.resetExit();
     runScript(request.responseHandler, { client, response }, baseDir);
+    await client.flushCacheOps();
     testResults = await client.runTests();
   }
 
@@ -220,7 +267,47 @@ export async function executeRequest(
     logs: [...client._logs],
     skipped: false,
     networkError,
+    cached: false,
   };
+}
+
+/**
+ * Write response body to a file (>> redirect).
+ */
+function writeResponseRedirect(
+  request: RequestDescriptor,
+  response: IHttpResponse,
+  client: HttpClientRunner,
+  envVars: Record<string, string>,
+  baseDir: string,
+): void {
+  if (!request.responseRedirect) return;
+  const outPath = path.resolve(
+    baseDir,
+    substituteVariables(
+      request.responseRedirect.path,
+      client.getVariables(),
+      envVars,
+    ),
+  );
+  const content =
+    typeof response.body === 'object'
+      ? JSON.stringify(response.body, null, 2)
+      : String(response.body);
+  if (request.responseRedirect.overwrite || !fs.existsSync(outPath)) {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, content, 'utf-8');
+  } else {
+    const ext = path.extname(outPath);
+    const base = outPath.slice(0, -ext.length || undefined);
+    let i = 1;
+    let candidate = `${base}_${i}${ext}`;
+    while (fs.existsSync(candidate)) {
+      i++;
+      candidate = `${base}_${i}${ext}`;
+    }
+    fs.writeFileSync(candidate, content, 'utf-8');
+  }
 }
 
 /**

@@ -1,0 +1,64 @@
+### Cache auto-key
+# @cache(ttl=30000)
+GET {{host}}/get?q=cached
+
+> {%
+  client.global.set("cachedStatus", response.status);
+  client.test("auto-key: status is 200", function() {
+    client.assert(response.status === 200, "Expected 200");
+  });
+%}
+
+###
+
+### Cache auto-key (repeat — should be cached)
+# @cache(ttl=30000)
+GET {{host}}/get?q=cached
+
+> {%
+  client.test("auto-key repeat: status is 200", function() {
+    client.assert(response.status === 200, "Expected 200 from cache");
+  });
+%}
+
+###
+
+### Cache named key
+# @cache(ttl=30000, key=named-test)
+GET {{host}}/get?q=named
+
+> {%
+  client.global.set("namedBody", response.body);
+  client.test("named-key: status is 200", function() {
+    client.assert(response.status === 200, "Expected 200");
+  });
+%}
+
+###
+
+### Cache named key (repeat — should be cached)
+# @cache(ttl=30000, key=named-test)
+GET {{host}}/get?q=named
+
+> {%
+  client.test("named-key repeat: body matches", function() {
+    client.assert(response.status === 200, "Expected 200 from cache");
+  });
+%}
+
+###
+
+### Invalidate named key then re-fetch
+# @cache(ttl=30000, key=named-test)
+GET {{host}}/get?q=after-invalidation
+
+< {%
+  // Delete the named cache entry before the request
+  client.cache.delete("named-test");
+%}
+
+> {%
+  client.test("after invalidation: got fresh response", function() {
+    client.assert(response.status === 200, "Expected 200");
+  });
+%}

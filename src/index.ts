@@ -5,8 +5,9 @@ export {
   parseHttpFileEntries,
   parseHttpStringEntries,
 } from './parser';
-export { HttpClient } from './client';
+export { HttpClientRunner } from './client';
 export { loadEnvironment, substituteVariables } from './environment';
+export { MemoryCacheAdapter } from './cache';
 
 // Re-export all types
 export type {
@@ -26,9 +27,12 @@ export type {
   RunResult,
   RunOptions,
   ExecuteOptions,
-  HttpClientOptions,
+  HttpClientRunnerOptions,
   EnvironmentFile,
   ImportDirective,
   RunDirective,
   ParsedEntry,
+  CacheAdapter,
+  CachedResponse,
+  CacheDirective,
 } from './types';

@@ -3,6 +3,7 @@ import * as path from 'path';
 import type {
   RequestDescriptor,
   ResponseRedirect,
+  CacheDirective,
   ParsedEntry,
   ImportDirective,
   RunDirective,
@@ -262,6 +263,7 @@ function parseRequestBlock(
   const directives = new Set<string>();
   let timeout: number | null = null;
   let connectionTimeout: number | null = null;
+  let cache: CacheDirective | null = null;
   let preRequestScript: string | null = null;
   let responseHandler: string | null = null;
   let responseRedirect: ResponseRedirect | null = null;
@@ -322,6 +324,14 @@ function parseRequestBlock(
         connTimeoutMatch[1],
         connTimeoutMatch[2],
       );
+      i++;
+      continue;
+    }
+
+    // @cache(ttl=30000) or @cache(ttl=30000, key=foo)
+    const cacheMatch = line.match(/^[#/]{1,2}\s*@cache\(([^)]+)\)\s*$/);
+    if (cacheMatch) {
+      cache = parseCacheDirective(cacheMatch[1]);
       i++;
       continue;
     }
@@ -450,6 +460,7 @@ function parseRequestBlock(
     directives,
     timeout,
     connectionTimeout,
+    cache,
   };
 }
 
@@ -560,4 +571,31 @@ function parseDuration(value: string, unit?: string): number {
     default:
       return num;
   }
+}
+
+// ===========================================================================
+// Parse @cache directive parameters
+// ===========================================================================
+function parseCacheDirective(params: string): CacheDirective | null {
+  let ttl: number | null = null;
+  let key: string | undefined;
+
+  for (const part of params.split(',')) {
+    const kvMatch = part.trim().match(/^(\w+)\s*=\s*(.+)$/);
+    if (!kvMatch) continue;
+    const [, k, v] = kvMatch;
+    if (k === 'ttl') {
+      ttl = parseInt(v.trim(), 10);
+      if (isNaN(ttl)) return null;
+    } else if (k === 'key') {
+      let value = v.trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      key = value;
+    }
+  }
+
+  if (ttl == null) return null;
+  return { ttl, ...(key !== undefined && { key }) };
 }

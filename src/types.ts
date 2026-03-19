@@ -1,5 +1,26 @@
-import type { AxiosResponse } from 'axios';
-import type { HttpClient } from './client';
+import type { HttpClientRunner } from './client';
+
+/** Cache directive parsed from `# @cache(ttl=30000)` or `# @cache(ttl=30000, key=foo)` */
+export interface CacheDirective {
+  ttl: number;
+  key?: string;
+}
+
+/** Stored cached response data */
+export interface CachedResponse {
+  status: number;
+  body: unknown;
+  headers: Record<string, string | string[]>;
+  contentType: ContentType;
+}
+
+/** Pluggable cache adapter interface */
+export interface CacheAdapter {
+  get(key: string): Promise<CachedResponse | undefined>;
+  set(key: string, value: CachedResponse, ttlMs: number): Promise<void>;
+  delete(key: string): Promise<boolean>;
+  clear(): Promise<void>;
+}
 
 /** Parsed request descriptor from an .http file */
 export interface RequestDescriptor {
@@ -14,6 +35,7 @@ export interface RequestDescriptor {
   directives: Set<string>;
   timeout: number | null;
   connectionTimeout: number | null;
+  cache: CacheDirective | null;
 }
 
 export interface ResponseRedirect {
@@ -86,7 +108,7 @@ export interface RequestProxy {
 
 /** Script sandbox context */
 export interface ScriptSandbox {
-  client: HttpClient;
+  client: HttpClientRunner;
   response?: IHttpResponse;
   request?: RequestProxy;
 }
@@ -99,6 +121,7 @@ export interface ExecutionResult {
   skipped: boolean;
   /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
   networkError: string | null;
+  cached: boolean;
 }
 
 /** Per-request result in a run */
@@ -115,6 +138,7 @@ export interface RequestResult {
   skipped: boolean;
   /** Non-null when the request failed at the network level (e.g. ECONNREFUSED, ETIMEDOUT). */
   networkError: string | null;
+  cached: boolean;
 }
 
 /** Summary of an entire run */
@@ -133,7 +157,7 @@ export interface RunSummary {
 export interface RunResult {
   results: RequestResult[];
   summary: RunSummary;
-  client: HttpClient;
+  client: HttpClientRunner;
 }
 
 /** Options for runFile / runString */
@@ -141,7 +165,7 @@ export interface RunOptions {
   environment?: string;
   variables?: Record<string, string>;
   verbose?: boolean;
-  client?: HttpClient;
+  client?: HttpClientRunner;
   baseDir?: string;
 }
 
@@ -151,9 +175,10 @@ export interface ExecuteOptions {
   baseDir?: string;
 }
 
-/** Options for HttpClient constructor */
-export interface HttpClientOptions {
+/** Options for HttpClientRunner constructor */
+export interface HttpClientRunnerOptions {
   verbose?: boolean;
+  cacheAdapter?: CacheAdapter;
 }
 
 /** Environment file structure */

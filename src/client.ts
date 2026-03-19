@@ -1,7 +1,9 @@
+import { MemoryCacheAdapter } from './cache';
 import type {
+  CacheAdapter,
   ClientGlobal,
   ClientGlobalHeaders,
-  HttpClientOptions,
+  HttpClientRunnerOptions,
   TestResult,
 } from './types';
 
@@ -21,18 +23,39 @@ import type {
  *   client.log(text)
  *   client.exit()
  */
-export class HttpClient {
+export class HttpClientRunner {
   private _variables: Map<string, unknown> = new Map();
   private _headers: Map<string, string> = new Map();
   private _tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
   public _logs: string[] = [];
   private _verbose: boolean;
   private _exited: boolean = false;
+  private _cacheAdapter: CacheAdapter;
+  private _pendingCacheOps: Promise<unknown>[] = [];
 
   public global: ClientGlobal;
 
-  constructor(options: HttpClientOptions = {}) {
+  /** Restricted cache access for script sandboxes. */
+  public cache: {
+    delete(key: string): Promise<boolean>;
+    clear(): Promise<void>;
+  };
+
+  constructor(options: HttpClientRunnerOptions = {}) {
     this._verbose = options.verbose ?? false;
+    this._cacheAdapter = options.cacheAdapter ?? new MemoryCacheAdapter();
+    this.cache = {
+      delete: (key: string) => {
+        const p = this._cacheAdapter.delete(key);
+        this._pendingCacheOps.push(p);
+        return p;
+      },
+      clear: () => {
+        const p = this._cacheAdapter.clear();
+        this._pendingCacheOps.push(p);
+        return p;
+      },
+    };
 
     this.global = {
       set: (name: string, value: unknown): void => {
@@ -109,6 +132,11 @@ export class HttpClient {
     return Object.fromEntries(this._headers);
   }
 
+  /** Whether verbose logging is enabled. */
+  get verbose(): boolean {
+    return this._verbose;
+  }
+
   /** Check if exit() was called. */
   get exited(): boolean {
     return this._exited;
@@ -117,5 +145,17 @@ export class HttpClient {
   /** Reset exit flag for next request. */
   resetExit(): void {
     this._exited = false;
+  }
+
+  /** Get the cache adapter (used by executor). */
+  getCacheAdapter(): CacheAdapter {
+    return this._cacheAdapter;
+  }
+
+  /** Await any pending cache operations queued by script sandboxes. */
+  async flushCacheOps(): Promise<void> {
+    if (this._pendingCacheOps.length === 0) return;
+    await Promise.all(this._pendingCacheOps);
+    this._pendingCacheOps = [];
   }
 }

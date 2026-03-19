@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/http-client-runner.svg)](https://www.npmjs.com/package/http-client-runner)
 [![license](https://img.shields.io/npm/l/http-client-runner.svg)](https://github.com/hkristjan/http-client-runner/blob/main/LICENSE)
 
-Execute JetBrains-style `.http` files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments.
+Execute JetBrains-style `.http` files programmatically with axios — supports request chaining, JS handlers, variables, imports, environments, and response caching.
 
 Use it as a **library** in your Node.js/TypeScript code, or as a **CLI** to run `.http` files directly from the terminal.
 
@@ -91,7 +91,7 @@ Executes all requests in a `.http` file sequentially.
 | `environment` | `string` | Environment name to load from `http-client.env.json` |
 | `variables` | `Record<string, string>` | Additional variables to inject (e.g. `{ host: 'http://localhost:3000' }`) |
 | `verbose` | `boolean` | Print request/response info to stdout |
-| `client` | `HttpClient` | Reuse an existing client instance (shares global variables across runs) |
+| `client` | `HttpClientRunner` | Reuse an existing client instance (shares global variables across runs) |
 
 **Returns `RunResult`:**
 
@@ -99,7 +99,7 @@ Executes all requests in a `.http` file sequentially.
 interface RunResult {
   results: RequestResult[];
   summary: RunSummary;
-  client: HttpClient;
+  client: HttpClientRunner;
 }
 
 interface RunSummary {
@@ -142,14 +142,14 @@ Full parser that returns all entries including `import`/`run` directives alongsi
 
 Same as `parseHttpFileEntries` but takes a string.
 
-### `HttpClient`
+### `HttpClientRunner`
 
 Create a standalone client to share state across multiple file runs:
 
 ```ts
-import { HttpClient, runFile } from 'http-client-runner';
+import { HttpClientRunner, runFile } from 'http-client-runner';
 
-const client = new HttpClient({ verbose: true });
+const client = new HttpClientRunner({ verbose: true });
 
 // Run auth file first – sets tokens in client.global
 await runFile('./auth.http', { client });
@@ -171,10 +171,13 @@ import type {
   RequestDescriptor,
   TestResult,
   IHttpResponse,
-  HttpClientOptions,
+  HttpClientRunnerRunnerOptions,
   ParsedEntry,
   ImportDirective,
   RunDirective,
+  CacheAdapter,
+  CachedResponse,
+  CacheDirective,
 } from 'http-client-runner';
 ```
 
@@ -364,6 +367,100 @@ GET https://api.example.com/slow-endpoint
 | `@no-cookie-jar` | Don't store cookies |
 | `@timeout <value> <unit>` | Read timeout (ms, s, m) |
 | `@connection-timeout <value> <unit>` | Connection timeout |
+| `@cache(ttl=<ms>)` | Cache the response for the given TTL (milliseconds) |
+| `@cache(ttl=<ms>, key=<name>)` | Cache with an explicit key (useful for invalidation) |
+
+### Response Caching
+
+Add a `@cache` directive to avoid repeated network calls for the same request. Cached responses are stored in memory by default and expire after the specified TTL.
+
+**Auto-keyed cache** — the cache key is derived from method, URL, headers, and body:
+
+```http
+# @cache(ttl=30000)
+GET {{host}}/api/config
+```
+
+**Named cache key** — use an explicit key so you can reference or invalidate it:
+
+```http
+# @cache(ttl=30000, key=user-profile)
+GET {{host}}/api/users/{{userId}}
+```
+
+When a cache hit occurs, the stored response is returned without making a network request. Post-response handlers and response redirects still run on cached responses, so your test assertions and variable extraction work the same way.
+
+**Cache invalidation from scripts** — use `client.cache.delete(key)` to remove a specific entry or `client.cache.clear()` to wipe the entire cache. These work in both pre-request and post-response handlers, and are safely awaited even with async adapters like Redis.
+
+**Invalidate before a request** — force a fresh fetch by deleting the cached entry in a pre-request script:
+
+```http
+# @cache(ttl=30000, key=user-profile)
+GET {{host}}/api/users/{{userId}}
+
+< {%
+  // Force a fresh request by clearing the cached entry
+  client.cache.delete("user-profile");
+%}
+```
+
+**Invalidate after a response** — useful when a cached token or session is rejected by the server. The post-response handler can detect the failure and evict the stale entry so the next request fetches a fresh one:
+
+```http
+### Cache the auth token for 10 minutes
+# @cache(ttl=600000, key=auth-token)
+POST {{host}}/auth/token
+Content-Type: application/json
+
+{"client_id": "{{clientId}}", "client_secret": "{{clientSecret}}"}
+
+> {%
+  client.global.set("token", response.body.access_token);
+%}
+
+###
+
+### Call a protected endpoint using the cached token
+GET {{host}}/api/protected
+Authorization: Bearer {{token}}
+
+> {%
+  if (response.status === 401) {
+    // Token was revoked or expired server-side — invalidate the cache
+    // so the next run fetches a fresh token
+    client.cache.delete("auth-token");
+    client.log("Auth token invalidated — will refresh on next run");
+  }
+%}
+```
+
+To clear all cached entries at once (e.g. after a deployment or environment switch):
+
+```http
+< {%
+  client.cache.clear();
+%}
+GET {{host}}/api/health
+```
+
+Only successful responses (2xx) are cached. Network errors and non-2xx responses are never stored.
+
+**Custom cache adapter** — provide your own `CacheAdapter` implementation (e.g. Redis, filesystem) via the `HttpClientRunner` constructor:
+
+```ts
+import { HttpClientRunner, runFile } from 'http-client-runner';
+import type { CacheAdapter } from 'http-client-runner';
+
+const redisCache: CacheAdapter = {
+  async get(key) { /* ... */ },
+  async set(key, value, ttlMs) { /* ... */ },
+  async delete(key) { /* ... */ },
+  async clear() { /* ... */ },
+};
+
+const client = new HttpClientRunner({ cacheAdapter: redisCache });
+await runFile('./api.http', { client });
+```
 
 ### Response Redirect to File
 
