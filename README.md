@@ -390,7 +390,9 @@ GET {{host}}/api/users/{{userId}}
 
 When a cache hit occurs, the stored response is returned without making a network request. Post-response handlers and response redirects still run on cached responses, so your test assertions and variable extraction work the same way.
 
-**Cache invalidation from scripts** — use `client.cache.delete(key)` or `client.cache.clear()` in pre-request or post-response handlers:
+**Cache invalidation from scripts** — use `client.cache.delete(key)` to remove a specific entry or `client.cache.clear()` to wipe the entire cache. These work in both pre-request and post-response handlers, and are safely awaited even with async adapters like Redis.
+
+**Invalidate before a request** — force a fresh fetch by deleting the cached entry in a pre-request script:
 
 ```http
 # @cache(ttl=30000, key=user-profile)
@@ -400,6 +402,45 @@ GET {{host}}/api/users/{{userId}}
   // Force a fresh request by clearing the cached entry
   client.cache.delete("user-profile");
 %}
+```
+
+**Invalidate after a response** — useful when a cached token or session is rejected by the server. The post-response handler can detect the failure and evict the stale entry so the next request fetches a fresh one:
+
+```http
+### Cache the auth token for 10 minutes
+# @cache(ttl=600000, key=auth-token)
+POST {{host}}/auth/token
+Content-Type: application/json
+
+{"client_id": "{{clientId}}", "client_secret": "{{clientSecret}}"}
+
+> {%
+  client.global.set("token", response.body.access_token);
+%}
+
+###
+
+### Call a protected endpoint using the cached token
+GET {{host}}/api/protected
+Authorization: Bearer {{token}}
+
+> {%
+  if (response.status === 401) {
+    // Token was revoked or expired server-side — invalidate the cache
+    // so the next run fetches a fresh token
+    client.cache.delete("auth-token");
+    client.log("Auth token invalidated — will refresh on next run");
+  }
+%}
+```
+
+To clear all cached entries at once (e.g. after a deployment or environment switch):
+
+```http
+< {%
+  client.cache.clear();
+%}
+GET {{host}}/api/health
 ```
 
 Only successful responses (2xx) are cached. Network errors and non-2xx responses are never stored.
