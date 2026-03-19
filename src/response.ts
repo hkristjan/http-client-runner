@@ -50,12 +50,12 @@ export class HttpResponse implements IHttpResponse {
     return match ? match[1] : null;
   }
 
-  /** Extract raw headers for caching. */
+  /** Extract raw headers for caching (keys normalised to lowercase). */
   getRawHeaders(): Record<string, string | string[]> {
     const result: Record<string, string | string[]> = {};
     for (const [key, val] of Object.entries(this._raw.headers)) {
       if (val != null) {
-        result[key] = val as string | string[];
+        result[key.toLowerCase()] = val as string | string[];
       }
     }
     return result;

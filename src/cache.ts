@@ -15,11 +15,19 @@ export class MemoryCacheAdapter implements CacheAdapter {
       this._store.delete(key);
       return undefined;
     }
-    return entry.value;
+    return clone(entry.value);
   }
 
   async set(key: string, value: CachedResponse, ttlMs: number): Promise<void> {
-    this._store.set(key, { value, expiresAt: Date.now() + ttlMs });
+    this._pruneExpired();
+    this._store.set(key, { value: clone(value), expiresAt: Date.now() + ttlMs });
+  }
+
+  private _pruneExpired(): void {
+    const now = Date.now();
+    for (const [k, entry] of this._store) {
+      if (now > entry.expiresAt) this._store.delete(k);
+    }
   }
 
   async delete(key: string): Promise<boolean> {
@@ -42,9 +50,13 @@ export function computeCacheKey(
   body: string | undefined,
 ): string {
   const sortedHeaders = Object.keys(headers)
+    .map((k) => `${k.toLowerCase()}=${headers[k]}`)
     .sort()
-    .map((k) => `${k}=${headers[k]}`)
     .join('&');
   const raw = `${method}|${url}|${sortedHeaders}|${body ?? ''}`;
   return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
+function clone(value: CachedResponse): CachedResponse {
+  return JSON.parse(JSON.stringify(value));
 }

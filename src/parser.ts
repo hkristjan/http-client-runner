@@ -588,7 +588,11 @@ function parseCacheDirective(params: string): CacheDirective | null {
       ttl = parseInt(v.trim(), 10);
       if (isNaN(ttl)) return null;
     } else if (k === 'key') {
-      key = v.trim();
+      let value = v.trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      key = value;
     }
   }
 
