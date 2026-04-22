@@ -92,6 +92,7 @@ Executes all requests in a `.http` file sequentially.
 | `variables` | `Record<string, string>` | Additional variables to inject (e.g. `{ host: 'http://localhost:3000' }`) |
 | `verbose` | `boolean` | Print request/response info to stdout |
 | `client` | `HttpClientRunner` | Reuse an existing client instance (shares global variables across runs) |
+| `requestFn` | `RequestFn` | Custom HTTP transport — replaces the built-in axios call. Falls back to axios if omitted. |
 
 **Returns `RunResult`:**
 
@@ -158,6 +159,29 @@ await runFile('./auth.http', { client });
 await runFile('./api-tests.http', { client });
 ```
 
+### Custom request function
+
+Inject a custom HTTP transport via `requestFn`. The executor calls it instead of the built-in axios call — useful for adding structured logging, auth strategies, or instrumentation from your existing HTTP layer:
+
+```ts
+import { HttpClientRunner, runFile } from 'http-client-runner';
+import type { RequestFn } from 'http-client-runner';
+
+const client = new HttpClientRunner();
+const variables = { host: 'https://api.example.com' };
+
+// Example: wrap your own HTTP client for logging/auth
+const requestFn: RequestFn = (config) => myHttpClient.request(config);
+
+await runFile('./vendor.http', {
+  client,
+  variables,
+  requestFn,
+});
+```
+
+Falls back to the built-in axios call when `requestFn` is omitted — fully backward-compatible.
+
 ### Exported Types
 
 All interfaces are exported from the package for use in your TypeScript code:
@@ -171,13 +195,14 @@ import type {
   RequestDescriptor,
   TestResult,
   IHttpResponse,
-  HttpClientRunnerRunnerOptions,
+  HttpClientRunnerOptions,
   ParsedEntry,
   ImportDirective,
   RunDirective,
   CacheAdapter,
   CachedResponse,
   CacheDirective,
+  RequestFn,
 } from 'http-client-runner';
 ```
 

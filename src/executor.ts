@@ -28,7 +28,7 @@ export async function executeRequest(
   envVars: Record<string, string>,
   options: ExecuteOptions = {},
 ): Promise<ExecutionResult> {
-  const { verbose = false, baseDir = process.cwd() } = options;
+  const { verbose = false, baseDir = process.cwd(), requestFn } = options;
   const clientVars = client.getVariables();
 
   // --- Variable substitution on URL, headers, body ---
@@ -206,7 +206,7 @@ export async function executeRequest(
   let response: IHttpResponse;
   let networkError: string | null = null;
   try {
-    const axiosResp = await axios(axiosConfig);
+    const axiosResp = requestFn ? await requestFn(axiosConfig) : await axios(axiosConfig);
     response = new HttpResponse(axiosResp);
   } catch (err) {
     const axiosError = err as AxiosError;

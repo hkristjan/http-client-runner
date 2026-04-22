@@ -18,6 +18,7 @@ import type {
   ImportDirective,
   RunDirective,
   VariablesEntry,
+  RequestFn,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,7 @@ async function _runEntries(
   const {
     environment: envName,
     variables: extraVars = {},
+    requestFn,
   } = options;
 
   const client = options.client || new HttpClientRunner({ verbose: options.verbose });
@@ -151,6 +153,7 @@ async function _runEntries(
           envVars,
           baseDir,
           verbose,
+          requestFn,
         );
         results.push(...runResults);
         requestCounter += runResults.length;
@@ -175,6 +178,7 @@ async function _runEntries(
         const result = await executeRequest(req, client, envVars, {
           verbose: shouldLog,
           baseDir,
+          requestFn,
         });
 
         results.push({
@@ -234,6 +238,7 @@ async function _executeRunDirective(
   envVars: Record<string, string>,
   baseDir: string,
   verbose: boolean,
+  requestFn?: RequestFn,
 ): Promise<RequestResult[]> {
   const results: RequestResult[] = [];
 
@@ -306,6 +311,7 @@ async function _executeRunDirective(
     const result = await executeRequest(req, client, scopedEnvVars, {
       verbose,
       baseDir: runBaseDir,
+      requestFn,
     });
 
     results.push({
