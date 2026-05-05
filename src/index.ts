@@ -35,4 +35,5 @@ export type {
   CacheAdapter,
   CachedResponse,
   CacheDirective,
+  RequestFn,
 } from './types';

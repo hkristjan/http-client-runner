@@ -3,4 +3,5 @@ dist/
 *.tgz
 .idea/
 http-client.private.env.json
-.claude/settings.local.json
+.claude/
+docs/superpowers/

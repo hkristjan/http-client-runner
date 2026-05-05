@@ -1,4 +1,5 @@
 import type { HttpClientRunner } from './client';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 /** Cache directive parsed from `# @cache(ttl=30000)` or `# @cache(ttl=30000, key=foo)` */
 export interface CacheDirective {
@@ -21,6 +22,9 @@ export interface CacheAdapter {
   delete(key: string): Promise<boolean>;
   clear(): Promise<void>;
 }
+
+/** Pluggable HTTP transport function — receives the built axios config, must return an AxiosResponse. */
+export type RequestFn = (config: AxiosRequestConfig) => Promise<AxiosResponse>;
 
 /** Parsed request descriptor from an .http file */
 export interface RequestDescriptor {
@@ -167,12 +171,14 @@ export interface RunOptions {
   verbose?: boolean;
   client?: HttpClientRunner;
   baseDir?: string;
+  requestFn?: RequestFn;
 }
 
 /** Options for executeRequest */
 export interface ExecuteOptions {
   verbose?: boolean;
   baseDir?: string;
+  requestFn?: RequestFn;
 }
 
 /** Options for HttpClientRunner constructor */
