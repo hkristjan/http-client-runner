@@ -26,6 +26,13 @@ export interface CacheAdapter {
 /** Pluggable HTTP transport function — receives the built axios config, must return an AxiosResponse. */
 export type RequestFn = (config: AxiosRequestConfig) => Promise<AxiosResponse>;
 
+/**
+ * Parses an XML response body ahead of the response handler — typically on a worker
+ * thread. Resolving `undefined` means "not parsed", and consumers must parse it
+ * themselves, so a failing hook can never change behaviour.
+ */
+export type ParseXmlFn = (xml: string, mimeType: string) => Promise<unknown | undefined>;
+
 /** Parsed request descriptor from an .http file */
 export interface RequestDescriptor {
   name: string | null;
@@ -65,6 +72,11 @@ export interface IHttpResponse {
   body: unknown;
   contentType: ContentType;
   headers: ResponseHeaders;
+  /**
+   * Set by the `parseXml` hook when an XML body was parsed before the response handler
+   * ran, so handlers can skip re-parsing it. Undefined means "not pre-parsed".
+   */
+  parsedBody?: unknown;
 }
 
 /** Client global variable/header storage */
@@ -172,6 +184,7 @@ export interface RunOptions {
   client?: HttpClientRunner;
   baseDir?: string;
   requestFn?: RequestFn;
+  parseXml?: ParseXmlFn;
 }
 
 /** Options for executeRequest */
@@ -179,6 +192,7 @@ export interface ExecuteOptions {
   verbose?: boolean;
   baseDir?: string;
   requestFn?: RequestFn;
+  parseXml?: ParseXmlFn;
 }
 
 /** Options for HttpClientRunner constructor */

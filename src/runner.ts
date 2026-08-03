@@ -19,6 +19,7 @@ import type {
   RunDirective,
   VariablesEntry,
   RequestFn,
+  ParseXmlFn,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,7 @@ async function _runEntries(
     environment: envName,
     variables: extraVars = {},
     requestFn,
+    parseXml,
   } = options;
 
   const client = options.client || new HttpClientRunner({ verbose: options.verbose });
@@ -154,6 +156,7 @@ async function _runEntries(
           baseDir,
           verbose,
           requestFn,
+          parseXml,
         );
         results.push(...runResults);
         requestCounter += runResults.length;
@@ -179,6 +182,7 @@ async function _runEntries(
           verbose: shouldLog,
           baseDir,
           requestFn,
+          parseXml,
         });
 
         results.push({
@@ -239,6 +243,7 @@ async function _executeRunDirective(
   baseDir: string,
   verbose: boolean,
   requestFn?: RequestFn,
+  parseXml?: ParseXmlFn,
 ): Promise<RequestResult[]> {
   const results: RequestResult[] = [];
 
@@ -312,6 +317,7 @@ async function _executeRunDirective(
       verbose,
       baseDir: runBaseDir,
       requestFn,
+      parseXml,
     });
 
     results.push({

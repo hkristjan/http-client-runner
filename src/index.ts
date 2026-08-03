@@ -36,4 +36,5 @@ export type {
   CachedResponse,
   CacheDirective,
   RequestFn,
+  ParseXmlFn,
 } from './types';

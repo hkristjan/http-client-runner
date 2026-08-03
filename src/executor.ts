@@ -17,6 +17,7 @@ import type {
   CacheAdapter,
   CachedResponse,
   TestResult,
+  ParseXmlFn,
 } from './types';
 
 /**
@@ -28,7 +29,7 @@ export async function executeRequest(
   envVars: Record<string, string>,
   options: ExecuteOptions = {},
 ): Promise<ExecutionResult> {
-  const { verbose = false, baseDir = process.cwd(), requestFn } = options;
+  const { verbose = false, baseDir = process.cwd(), requestFn, parseXml } = options;
   const clientVars = client.getVariables();
 
   // --- Variable substitution on URL, headers, body ---
@@ -131,6 +132,7 @@ export async function executeRequest(
       let testResults: TestResult[] = [];
       if (request.responseHandler) {
         client.resetExit();
+        await attachParsedXml(response, parseXml);
         runScript(request.responseHandler, { client, response }, baseDir);
         await client.flushCacheOps();
         testResults = await client.runTests();
@@ -256,6 +258,7 @@ export async function executeRequest(
   let testResults: TestResult[] = [];
   if (request.responseHandler) {
     client.resetExit();
+    await attachParsedXml(response, parseXml);
     runScript(request.responseHandler, { client, response }, baseDir);
     await client.flushCacheOps();
     testResults = await client.runTests();
@@ -269,6 +272,34 @@ export async function executeRequest(
     networkError,
     cached: false,
   };
+}
+
+/**
+ * Pre-parses an XML body via the injected hook so the response handler doesn't have to.
+ *
+ * Swallows every failure: this is an optimisation, and leaving `parsedBody` unset simply
+ * means the handler parses the string itself, exactly as it did before the hook existed.
+ */
+async function attachParsedXml(
+  response: IHttpResponse,
+  parseXml: ParseXmlFn | undefined,
+): Promise<void> {
+  if (!parseXml || typeof response.body !== 'string') {
+    return;
+  }
+  const looksLikeXml =
+    response.contentType.mimeType.includes('xml') || response.body.trimStart().startsWith('<');
+  if (!looksLikeXml) {
+    return;
+  }
+  try {
+    const parsed = await parseXml(response.body, response.contentType.mimeType);
+    if (parsed !== undefined) {
+      response.parsedBody = parsed;
+    }
+  } catch {
+    // Intentionally ignored — see the doc comment.
+  }
 }
 
 /**
