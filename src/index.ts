@@ -37,4 +37,6 @@ export type {
   CacheDirective,
   RequestFn,
   ParseXmlFn,
+  PendingMap,
+  MapResponseFn,
 } from './types';

@@ -182,6 +182,43 @@ await runFile('./vendor.http', {
 
 Falls back to the built-in axios call when `requestFn` is omitted — fully backward-compatible.
 
+### Mapping responses (`client.mapResponse()`)
+
+Inside a response handler, `client.mapResponse(mappingPath, extraContext?)` records intent
+to map the response body through a mapping file — it does no work itself. Once recorded,
+the runner awaits an injectable `mapResponse` hook (typically offloading the actual mapping
+to a worker thread) after the response handler finishes and before any `client.test()`
+assertions run, replacing `response.body` with whatever the hook resolves to:
+
+```ts
+import { runFile } from 'http-client-runner';
+
+await runFile('./vendor.http', {
+  mapResponse: async (mappingPath, response, extraContext) => {
+    return applyMapping(mappingPath, response.body, extraContext);
+  },
+});
+```
+
+```http
+GET https://api.example.com/products
+
+> {%
+    client.mapResponse("mappings/products.json", { locale: "en-GB" });
+%}
+```
+
+A response served from the cache still runs its response handler, so a mapping recorded
+there is applied on the cache-hit path too, not just on a fresh request.
+
+If a handler calls `client.mapResponse()` but no `mapResponse` hook was supplied to the
+runner, the run throws — a recorded mapping with nowhere to go is treated as a hard error,
+never a silent no-op.
+
+> **Breaking change in 3.0.0:** `RunOptions`/`ExecuteOptions` gained a new `mapResponse`
+> option, and `HttpClientRunner` gained two new methods (`mapResponse()` and
+> `takePendingMap()`).
+
 ### Exported Types
 
 All interfaces are exported from the package for use in your TypeScript code:

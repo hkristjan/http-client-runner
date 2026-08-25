@@ -5,6 +5,7 @@ import type {
   ClientGlobalHeaders,
   HttpClientRunnerOptions,
   TestResult,
+  PendingMap,
 } from './types';
 
 /**
@@ -32,6 +33,7 @@ export class HttpClientRunner {
   private _exited: boolean = false;
   private _cacheAdapter: CacheAdapter;
   private _pendingCacheOps: Promise<unknown>[] = [];
+  private _pendingMap: PendingMap | undefined = undefined;
 
   public global: ClientGlobal;
 
@@ -145,6 +147,27 @@ export class HttpClientRunner {
   /** Reset exit flag for next request. */
   resetExit(): void {
     this._exited = false;
+  }
+
+  /**
+   * Records a mapping to be applied to this response by the runner after the handler returns.
+   *
+   * Synchronous and side-effect-free by design: the sandbox cannot await, so the actual
+   * mapping — which may run on a worker thread — happens once the handler has finished.
+   * The result replaces `response.body`.
+   *
+   * Calling this more than once per request replaces the previous recording; only one
+   * mapping is applied.
+   */
+  mapResponse(mappingPath: string, extraContext: object = {}): void {
+    this._pendingMap = { mappingPath, extraContext };
+  }
+
+  /** Returns and clears the pending mapping. Used by the executor. */
+  takePendingMap(): PendingMap | undefined {
+    const pending = this._pendingMap;
+    this._pendingMap = undefined;
+    return pending;
   }
 
   /** Get the cache adapter (used by executor). */

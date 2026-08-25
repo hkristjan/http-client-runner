@@ -18,6 +18,7 @@ import type {
   CachedResponse,
   TestResult,
   ParseXmlFn,
+  MapResponseFn,
 } from './types';
 
 /**
@@ -29,7 +30,7 @@ export async function executeRequest(
   envVars: Record<string, string>,
   options: ExecuteOptions = {},
 ): Promise<ExecutionResult> {
-  const { verbose = false, baseDir = process.cwd(), requestFn, parseXml } = options;
+  const { verbose = false, baseDir = process.cwd(), requestFn, parseXml, mapResponse } = options;
   const clientVars = client.getVariables();
 
   // --- Variable substitution on URL, headers, body ---
@@ -134,9 +135,16 @@ export async function executeRequest(
         client.resetExit();
         await attachParsedXml(response, parseXml);
         runScript(request.responseHandler, { client, response }, baseDir);
+        // Applied before flushCacheOps/runTests so tests can assert on the mapped body.
+        await applyPendingMap(client, response, mapResponse);
         await client.flushCacheOps();
         testResults = await client.runTests();
       }
+      // Drained unconditionally, even when there was no responseHandler above: a pre-request
+      // script can also call client.mapResponse(), and any mapping left pending here would
+      // otherwise survive to leak onto the next request in the file. A no-op if already
+      // drained by the branch above.
+      await applyPendingMap(client, response, mapResponse);
 
       return {
         response,
@@ -260,9 +268,16 @@ export async function executeRequest(
     client.resetExit();
     await attachParsedXml(response, parseXml);
     runScript(request.responseHandler, { client, response }, baseDir);
+    // Applied before flushCacheOps/runTests so tests can assert on the mapped body.
+    await applyPendingMap(client, response, mapResponse);
     await client.flushCacheOps();
     testResults = await client.runTests();
   }
+  // Drained unconditionally, even when there was no responseHandler above: a pre-request
+  // script can also call client.mapResponse(), and any mapping left pending here would
+  // otherwise survive to leak onto the next request in the file. A no-op if already
+  // drained by the branch above.
+  await applyPendingMap(client, response, mapResponse);
 
   return {
     response,
@@ -300,6 +315,30 @@ async function attachParsedXml(
   } catch {
     // Intentionally ignored — see the doc comment.
   }
+}
+
+/**
+ * Applies a mapping recorded by `client.mapResponse()`, replacing `response.body`.
+ *
+ * Deliberately does NOT swallow errors, unlike `attachParsedXml`. A failed parse hook is an
+ * optimisation the handler can redo itself; a failed or missing mapping hook means the body
+ * is simply not mapped, which would silently return the wrong shape to the caller.
+ */
+async function applyPendingMap(
+  client: HttpClientRunner,
+  response: IHttpResponse,
+  mapResponse: MapResponseFn | undefined,
+): Promise<void> {
+  const pending = client.takePendingMap();
+  if (!pending) {
+    return;
+  }
+  if (!mapResponse) {
+    throw new Error(
+      `client.mapResponse("${pending.mappingPath}") was called but no mapResponse hook was supplied to the runner`,
+    );
+  }
+  response.body = await mapResponse(pending.mappingPath, response, pending.extraContext);
 }
 
 /**

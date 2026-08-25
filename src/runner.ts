@@ -20,6 +20,7 @@ import type {
   VariablesEntry,
   RequestFn,
   ParseXmlFn,
+  MapResponseFn,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ async function _runEntries(
     variables: extraVars = {},
     requestFn,
     parseXml,
+    mapResponse,
   } = options;
 
   const client = options.client || new HttpClientRunner({ verbose: options.verbose });
@@ -157,6 +159,7 @@ async function _runEntries(
           verbose,
           requestFn,
           parseXml,
+          mapResponse,
         );
         results.push(...runResults);
         requestCounter += runResults.length;
@@ -183,6 +186,7 @@ async function _runEntries(
           baseDir,
           requestFn,
           parseXml,
+          mapResponse,
         });
 
         results.push({
@@ -244,6 +248,7 @@ async function _executeRunDirective(
   verbose: boolean,
   requestFn?: RequestFn,
   parseXml?: ParseXmlFn,
+  mapResponse?: MapResponseFn,
 ): Promise<RequestResult[]> {
   const results: RequestResult[] = [];
 
@@ -318,6 +323,7 @@ async function _executeRunDirective(
       baseDir: runBaseDir,
       requestFn,
       parseXml,
+      mapResponse,
     });
 
     results.push({

@@ -1,6 +1,6 @@
 {
   "name": "http-client-runner",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Execute JetBrains-style .http files programmatically with axios — supports request chaining, JS handlers, variables, imports, and environments",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,12 +24,13 @@
     "clean": "rm -rf dist",
     "prebuild": "rm -rf dist",
     "prepublishOnly": "npm run build",
-    "test": "tsx examples/run-chain.ts && tsx examples/run-import.ts && tsx examples/run-econnrefused.ts && tsx examples/run-cache.ts && tsx examples/run-custom-request.ts && tsx examples/run-parse-xml.ts",
+    "test": "tsx examples/run-chain.ts && tsx examples/run-import.ts && tsx examples/run-econnrefused.ts && tsx examples/run-cache.ts && tsx examples/run-custom-request.ts && tsx examples/run-parse-xml.ts && tsx examples/run-map-response.ts",
     "test:chain": "tsx examples/run-chain.ts",
     "test:import": "tsx examples/run-import.ts",
     "test:econnrefused": "tsx examples/run-econnrefused.ts",
     "test:cache": "tsx examples/run-cache.ts",
-    "test:parse-xml": "tsx examples/run-parse-xml.ts"
+    "test:parse-xml": "tsx examples/run-parse-xml.ts",
+    "test:map-response": "tsx examples/run-map-response.ts"
   },
   "keywords": [
     "http",

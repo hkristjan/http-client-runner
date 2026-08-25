@@ -33,6 +33,25 @@ export type RequestFn = (config: AxiosRequestConfig) => Promise<AxiosResponse>;
  */
 export type ParseXmlFn = (xml: string, mimeType: string) => Promise<unknown | undefined>;
 
+/** A mapping recorded by `client.mapResponse()`, pending execution by the runner. */
+export interface PendingMap {
+  mappingPath: string;
+  extraContext: object;
+}
+
+/**
+ * Maps a response body through a mapping file — typically on a worker thread.
+ *
+ * Unlike `ParseXmlFn`, this hook is REQUIRED once a handler calls `client.mapResponse()`:
+ * there is no "decline" value, because declining would leave the body unmapped. The caller
+ * owns any fallback.
+ */
+export type MapResponseFn = (
+  mappingPath: string,
+  response: IHttpResponse,
+  extraContext: object,
+) => Promise<unknown>;
+
 /** Parsed request descriptor from an .http file */
 export interface RequestDescriptor {
   name: string | null;
@@ -185,6 +204,7 @@ export interface RunOptions {
   baseDir?: string;
   requestFn?: RequestFn;
   parseXml?: ParseXmlFn;
+  mapResponse?: MapResponseFn;
 }
 
 /** Options for executeRequest */
@@ -193,6 +213,7 @@ export interface ExecuteOptions {
   baseDir?: string;
   requestFn?: RequestFn;
   parseXml?: ParseXmlFn;
+  mapResponse?: MapResponseFn;
 }
 
 /** Options for HttpClientRunner constructor */
